@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys/stat.h> // Для mkdir()
+#include <unistd.h>   // Для rmdir() и других POSIX-функций
 
 // config
 #define MEMTABLE_SIZE 5
