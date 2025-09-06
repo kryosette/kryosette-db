@@ -13,35 +13,91 @@ void init_lsm_tree(LSMTree *tree)
     tree->memtable.capacity = MEMTABLE_SIZE;
     tree->sstable_count = 0;
 
-    for (int i = 0; i < MAX_SSTABLES; i++)
-    {
-        tree->sstables[i].pairs = NULL;
-        tree->sstables[i].size = 0;
+    load_data_from_file(tree);
 
-        /*
-        int snprintf(char *str, size_t size, const char *format, ...); (stdio)
-        The snprintf function in C is part of the stdio.h standard library and is
-        used for formatted output to a character array (buffer) with a specified
-        size limit. It is a safer alternative to sprintf because it prevents buffer
-        overflows by ensuring that no more than a specified number of characters
-        are written to the destination buffer.
-        */
-        snprintf(tree->sstables[i].filename, sizeof(tree->sstables[i].filename), "sstable%d.txt", i);
-    }
+    // for (int i = 0; i < MAX_SSTABLES; i++)
+    // {
+    //     tree->sstables[i].pairs = NULL;
+    //     tree->sstables[i].size = 0;
+
+    //     /*
+    //     int snprintf(char *str, size_t size, const char *format, ...); (stdio)
+    //     The snprintf function in C is part of the stdio.h standard library and is
+    //     used for formatted output to a character array (buffer) with a specified
+    //     size limit. It is a safer alternative to sprintf because it prevents buffer
+    //     overflows by ensuring that no more than a specified number of characters
+    //     are written to the destination buffer.
+    //     */
+    //     snprintf(tree->sstables[i].filename, sizeoдаyf(tree->sstables[i].filename), "sstable%d.txt", i);
+    // }
 
     printf("LSM-tree initialized with memtable capacity %d\n", MEMTABLE_SIZE);
 }
 
-void free_lsm_tree(LSMTree *tree)
+void load_data_from_file(LSMTree *tree)
 {
-    free(tree->memtable.pairs);
+    FILE *file = fopen(DATA_FILE, "rb");
+    if (!file)
+    {
+        // Файл не существует, это нормально при первом запуске
+        printf("No existing data file found, starting fresh\n");
+        return;
+    }
+
+    // Читаем количество SSTables
+    fread(&tree->sstable_count, sizeof(int), 1, file);
 
     for (int i = 0; i < tree->sstable_count; i++)
     {
-        free(tree->sstables[i].pairs);
+        SSTable *sstable = &tree->sstables[i];
+
+        // Читаем размер SSTable
+        fread(&sstable->size, sizeof(int), 1, file);
+
+        // Выделяем память
+        sstable->pairs = malloc(sstable->size * sizeof(KeyValuePair));
+        if (!sstable->pairs)
+        {
+            perror("Failed to allocate SSTable");
+            exit(EXIT_FAILURE);
+        }
+
+        // Читаем пары ключ-значение
+        fread(sstable->pairs, sizeof(KeyValuePair), sstable->size, file);
+
+        // Генерируем имя файла
+        snprintf(sstable->filename, sizeof(sstable->filename), "sstable%d.txt", i);
     }
 
-    printf("LSM-tree resources freed\n");
+    fclose(file);
+    printf("Loaded %d SSTables from data file\n", tree->sstable_count);
+}
+
+void save_all_data_to_file(LSMTree *tree)
+{
+    FILE *file = fopen(DATA_FILE, "wb");
+    if (!file)
+    {
+        perror("Failed to open data file for writing");
+        exit(EXIT_FAILURE);
+    }
+
+    // Сохраняем количество SSTables
+    fwrite(&tree->sstable_count, sizeof(int), 1, file);
+
+    for (int i = 0; i < tree->sstable_count; i++)
+    {
+        SSTable *sstable = &tree->sstables[i];
+
+        // Сохраняем размер SSTable
+        fwrite(&sstable->size, sizeof(int), 1, file);
+
+        // Сохраняем пары ключ-значение
+        fwrite(sstable->pairs, sizeof(KeyValuePair), sstable->size, file);
+    }
+
+    fclose(file);
+    printf("Saved %d SSTables to data file\n", tree->sstable_count);
 }
 
 int compare_keys(const void *a, const void *b)
@@ -338,16 +394,28 @@ void compact_sstables(LSMTree *tree)
     printf("Compaction complete. %d unique pairs in new SSTable\n", unique_count);
 }
 
+void free_lsm_tree(LSMTree *tree)
+{
+    if (tree->memtable.size > 0)
+    {
+        flush_memtable_to_sstable(tree);
+        save_all_data_to_file(tree);
+    }
+
+    free(tree->memtable.pairs);
+
+    for (int i = 0; i < tree->sstable_count; i++)
+    {
+        free(tree->sstables[i].pairs);
+    }
+
+    printf("LSM-tree resources freed\n");
+}
+
 int main()
 {
     LSMTree tree;
     init_lsm_tree(&tree);
-
-    lsm_put(&tree, "name", "Alice");
-    lsm_put(&tree, "age", "30");
-    lsm_put(&tree, "city", "New York");
-    lsm_put(&tree, "job", "Engineer");
-    lsm_put(&tree, "language", "C");
 
     lsm_put(&tree, "hobby", "Hiking");
 

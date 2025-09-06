@@ -10,7 +10,7 @@
 #include <unistd.h>   // Для rmdir() и других POSIX-функций
 
 // config
-#define MEMTABLE_SIZE 5
+#define MEMTABLE_SIZE 1
 #define MAX_SSTABLES 10
 #define KEY_SIZE 50
 #define VALUE_SIZE 100
@@ -65,5 +65,7 @@ void compact_sstables(LSMTree *tree);
 void save_sstable_to_disk(SSTable *sstable);
 void load_sstable_from_disk(SSTable *sstable, const char *filename);
 void lsm_delete(LSMTree *tree, const char *key);
+void load_data_from_file(LSMTree *tree);
+void save_all_data_to_file(LSMTree *tree);
 
 #endif
