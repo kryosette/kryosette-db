@@ -352,39 +352,6 @@ storage_node_t** buckets = [ptr0, ptr1, ptr2, ..., ptr1023];
      */
     typedef void (*server_on_command_cb)(int client_id, const char *command, void *user_data);
 
-    /**
-     * @brief Set client connection callback
-     *
-     * @param server Server instance
-     * @param callback Callback function
-     * @param user_data User context data passed to callback
-     */
-    void server_set_connect_callback(server_instance_t *server,
-                                     server_on_connect_cb callback,
-                                     void *user_data);
-
-    /**
-     * @brief Set client disconnection callback
-     *
-     * @param server Server instance
-     * @param callback Callback function
-     * @param user_data User context data passed to callback
-     */
-    void server_set_disconnect_callback(server_instance_t *server,
-                                        server_on_disconnect_cb callback,
-                                        void *user_data);
-
-    /**
-     * @brief Set command execution callback
-     *
-     * @param server Server instance
-     * @param callback Callback function
-     * @param user_data User context data passed to callback
-     */
-    void server_set_command_callback(server_instance_t *server,
-                                     server_on_command_cb callback,
-                                     void *user_data);
-
     /** @} */
 
     /* ===== Advanced Features ===== */

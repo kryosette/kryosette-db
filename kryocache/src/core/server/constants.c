@@ -72,6 +72,77 @@ static const size_t MAX_COMMAND_LENGTH = 8192;
 static const size_t MAX_ARGS_PER_COMMAND = 64;
 static const uint32_t MAX_COMMAND_EXECUTION_TIME = 5000; // 5 seconds
 
+// ==================== Network Constants ====================
+
+static const int SOCKET_PROTOCOL = 0;
+static const int SOCKET_SUCCESS_CODE = 0;
+static const int SOCKET_REUSEADDR_OPTION = 1;
+static const int SOCKET_LEVEL = SOL_SOCKET;
+static const int SOCKET_DOMAIN = AF_INET;
+static const int SOCKET_BIND_ADDRESS = INADDR_ANY;
+static const int SOCKET_BACKLOG = 10;
+static const int SOCKET_SHUTDOWN_MODE = SHUT_RDWR;
+
+// ==================== Test Constants ====================
+
+static const int TEST_CUSTOM_PORT = 9999;
+static const uint32_t TEST_MAX_CLIENTS = 500;
+static const size_t TEST_MAX_MEMORY = 536870912; // 512MB
+static const server_mode_t TEST_SERVER_MODE = SERVER_MODE_STANDALONE;
+static const char *TEST_BIND_ADDRESS = "127.0.0.1";
+static const char *TEST_DATA_DIRECTORY = "/tmp/test_cache";
+static const bool TEST_PERSISTENCE_ENABLED = true;
+static const int TEST_PERSISTENCE_INTERVAL = 60;
+
+static const int INVALID_PORT_NUMBER = 70000;
+static const uint32_t INVALID_CLIENT_COUNT = 0;
+static const int MINIMUM_PORT_NUMBER = 1024;
+static const int MAXIMUM_PORT_NUMBER = 65535;
+static const uint32_t MINIMUM_CLIENT_COUNT = 1;
+
+static const int INITIAL_TEST_COUNT = 0;
+static const int INITIAL_TEST_INDEX = 0;
+static const int INITIAL_CONNECTION_COUNT = 0;
+static const int INITIAL_COMMAND_COUNT = 0;
+static const size_t INITIAL_MEMORY_USAGE = 0;
+static const int STRING_START_INDEX = 0;
+static const char STRING_TERMINATOR = '\0';
+static const size_t ERROR_BUFFER_SIZE = 256;
+static const int MINIMUM_VERSION_LENGTH = 1;
+static const int MINIMUM_BUILD_INFO_LENGTH = 1;
+
+static const int INIT_TEST_COUNT = 3;
+static const int CONFIG_TEST_COUNT = 2;
+static const int INFO_TEST_COUNT = 2;
+static const int ADVANCED_TEST_COUNT = 2;
+
+static const int POLLING_INTERVAL_SECONDS = 1;
+static const int MILLISECONDS_PER_SECOND = 1000;
+static const int THREAD_SUCCESS_CODE = 0;
+
+// ==================== Error Message Constants ====================
+
+static const char *SOCKET_CREATION_ERROR_MESSAGE = "Socket creation failed";
+static const char *SOCKET_OPTION_ERROR_MESSAGE = "Socket option setting failed";
+static const char *SOCKET_BIND_ERROR_MESSAGE = "Socket bind failed";
+static const char *SOCKET_LISTEN_ERROR_MESSAGE = "Socket listen failed";
+static const char *THREAD_CREATION_ERROR_MESSAGE = "Thread creation failed";
+static const char *NULL_CONFIG_ERROR_MESSAGE = "Configuration is NULL";
+static const char *INVALID_PORT_ERROR_MESSAGE = "Invalid port number: %d";
+static const char *INVALID_CLIENT_COUNT_ERROR_MESSAGE = "Invalid client count";
+static const char *NULL_PARAMETER_ERROR_MESSAGE = "NULL parameter provided";
+
+static const char *SERVER_VERSION_STRING = "1.0.0";
+static const char *SERVER_BUILD_INFO_STRING = "In-Memory Cache Server 1.0.0";
+static const char *EMPTY_STRING = "";
+
+static const size_t DEFAULT_MAX_MEMORY = 0; // Unlimited
+static const server_mode_t DEFAULT_SERVER_MODE = SERVER_MODE_STANDALONE;
+static const char *DEFAULT_BIND_ADDRESS = NULL; // All interfaces
+static const char *DEFAULT_DATA_DIRECTORY = "./data";
+static const bool DEFAULT_PERSISTENCE_ENABLED = false;
+static const int DEFAULT_PERSISTENCE_INTERVAL = 300; // 5 minutes
+
 // ==================== Server Default Values Getters ====================
 
 uint16_t get_server_default_port(void) { return SERVER_DEFAULT_PORT; }
@@ -138,3 +209,87 @@ uint32_t get_client_timeout_seconds(void) { return CLIENT_TIMEOUT_SECONDS; }
 size_t get_max_command_length(void) { return MAX_COMMAND_LENGTH; }
 size_t get_max_args_per_command(void) { return MAX_ARGS_PER_COMMAND; }
 uint32_t get_max_command_execution_time(void) { return MAX_COMMAND_EXECUTION_TIME; }
+
+// ==================== Network Constants Getters ====================
+
+int get_socket_protocol(void) { return SOCKET_PROTOCOL; }
+int get_socket_success_code(void) { return SOCKET_SUCCESS_CODE; }
+int get_socket_reuseaddr_option(void) { return SOCKET_REUSEADDR_OPTION; }
+int get_socket_level(void) { return SOCKET_LEVEL; }
+int get_socket_domain(void) { return SOCKET_DOMAIN; }
+int get_socket_bind_address(void) { return SOCKET_BIND_ADDRESS; }
+int get_socket_backlog(void) { return SOCKET_BACKLOG; }
+int get_socket_shutdown_mode(void) { return SOCKET_SHUTDOWN_MODE; }
+
+// ==================== Test Constants Getters ====================
+
+int get_test_custom_port(void) { return TEST_CUSTOM_PORT; }
+uint32_t get_test_max_clients(void) { return TEST_MAX_CLIENTS; }
+size_t get_test_max_memory(void) { return TEST_MAX_MEMORY; }
+server_mode_t get_test_server_mode(void) { return TEST_SERVER_MODE; }
+const char *get_test_bind_address(void) { return TEST_BIND_ADDRESS; }
+const char *get_test_data_directory(void) { return TEST_DATA_DIRECTORY; }
+bool get_test_persistence_enabled(void) { return TEST_PERSISTENCE_ENABLED; }
+int get_test_persistence_interval(void) { return TEST_PERSISTENCE_INTERVAL; }
+
+int get_invalid_port_number(void) { return INVALID_PORT_NUMBER; }
+uint32_t get_invalid_client_count(void) { return INVALID_CLIENT_COUNT; }
+int get_minimum_port_number(void) { return MINIMUM_PORT_NUMBER; }
+int get_maximum_port_number(void) { return MAXIMUM_PORT_NUMBER; }
+uint32_t get_minimum_client_count(void) { return MINIMUM_CLIENT_COUNT; }
+
+int get_initial_test_count(void) { return INITIAL_TEST_COUNT; }
+int get_initial_test_index(void) { return INITIAL_TEST_INDEX; }
+int get_initial_connection_count(void) { return INITIAL_CONNECTION_COUNT; }
+int get_initial_command_count(void) { return INITIAL_COMMAND_COUNT; }
+size_t get_initial_memory_usage(void) { return INITIAL_MEMORY_USAGE; }
+int get_string_start_index(void) { return STRING_START_INDEX; }
+char get_string_terminator(void) { return STRING_TERMINATOR; }
+size_t get_error_buffer_size(void) { return ERROR_BUFFER_SIZE; }
+int get_minimum_version_length(void) { return MINIMUM_VERSION_LENGTH; }
+int get_minimum_build_info_length(void) { return MINIMUM_BUILD_INFO_LENGTH; }
+
+int get_init_test_count(void) { return INIT_TEST_COUNT; }
+int get_config_test_count(void) { return CONFIG_TEST_COUNT; }
+int get_info_test_count(void) { return INFO_TEST_COUNT; }
+int get_advanced_test_count(void) { return ADVANCED_TEST_COUNT; }
+
+int get_polling_interval_seconds(void) { return POLLING_INTERVAL_SECONDS; }
+int get_milliseconds_per_second(void) { return MILLISECONDS_PER_SECOND; }
+int get_thread_success_code(void) { return THREAD_SUCCESS_CODE; }
+
+// ==================== Error Message Getters ====================
+
+const char *get_socket_creation_error_message(void) { return SOCKET_CREATION_ERROR_MESSAGE; }
+const char *get_socket_option_error_message(void) { return SOCKET_OPTION_ERROR_MESSAGE; }
+const char *get_socket_bind_error_message(void) { return SOCKET_BIND_ERROR_MESSAGE; }
+const char *get_socket_listen_error_message(void) { return SOCKET_LISTEN_ERROR_MESSAGE; }
+const char *get_thread_creation_error_message(void) { return THREAD_CREATION_ERROR_MESSAGE; }
+const char *get_null_config_error_message(void) { return NULL_CONFIG_ERROR_MESSAGE; }
+const char *get_invalid_port_error_message(void) { return INVALID_PORT_ERROR_MESSAGE; }
+const char *get_invalid_client_count_error_message(void) { return INVALID_CLIENT_COUNT_ERROR_MESSAGE; }
+const char *get_null_parameter_error_message(void) { return NULL_PARAMETER_ERROR_MESSAGE; }
+
+const char *get_server_version_string(void) { return SERVER_VERSION_STRING; }
+const char *get_server_build_info_string(void) { return SERVER_BUILD_INFO_STRING; }
+const char *get_empty_string(void) { return EMPTY_STRING; }
+
+// ==================== Configuration Default Getters ====================
+
+size_t get_default_max_memory(void) { return DEFAULT_MAX_MEMORY; }
+server_mode_t get_default_server_mode(void) { return DEFAULT_SERVER_MODE; }
+const char *get_default_bind_address(void) { return DEFAULT_BIND_ADDRESS; }
+const char *get_default_data_directory(void) { return DEFAULT_DATA_DIRECTORY; }
+bool get_default_persistence_enabled(void) { return DEFAULT_PERSISTENCE_ENABLED; }
+int get_default_persistence_interval(void) { return DEFAULT_PERSISTENCE_INTERVAL; }
+
+// ==================== Utility Functions ====================
+
+double get_server_uptime_seconds(const server_instance_t *server)
+{
+    if (server == NULL || server->start_time == 0)
+    {
+        return 0.0;
+    }
+    return difftime(time(NULL), server->start_time);
+}
