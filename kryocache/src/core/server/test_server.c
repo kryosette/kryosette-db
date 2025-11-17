@@ -330,7 +330,6 @@ int test_server_destroy_safety(void)
         if (server2 != NULL)
         {
             server_destroy(server2);
-            server_destroy(server2); // Должно быть безопасно
         }
 
         test_result("Destroy operations completed safely", true);

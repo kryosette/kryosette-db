@@ -409,6 +409,13 @@ void server_destroy(server_instance_t *server)
         server_force_shutdown(server);
     }
 
+    if (server->clients == NULL && server->storage == NULL)
+    {
+        printf("DEBUG: server already destroyed, skipping\n");
+        free(server);
+        return;
+    }
+
     // free 4 - освобождаем массив клиентов
     if (server->clients != NULL)
     {
