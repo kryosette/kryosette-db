@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "server.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
 
 /**
  * @file constants.h
@@ -23,7 +23,7 @@ extern "C"
 #endif
 
     // ==================== Server Configuration Default ====================
-    server_config_t server_config_default(void);          ///< Create default server configuration
+    server_config_t server_config_default(void); ///< Create default server configuration
 
     // ==================== Server Default Values ====================
     uint16_t get_server_default_port(void);    ///< Default server port (Redis-compatible)
@@ -48,6 +48,8 @@ extern "C"
     // ==================== Client Constants ====================
     uint32_t get_max_clients_count(const server_config_t *config); ///< Max clients from config
     uint32_t get_initial_client_count(void);                       ///< Initial client count
+    size_t get_max_safe_client_count(void);
+    size_t get_default_client_count(void);
 
     // ==================== Utility Constants ====================
     const char *get_initial_error_message(void); ///< Initial error message
@@ -101,8 +103,8 @@ extern "C"
 
     int get_invalid_port_number(void);       ///< Invalid port number for testing
     uint32_t get_invalid_client_count(void); ///< Invalid client count for testing
-    int get_minimum_port_number(void);       ///< Minimum valid port number
-    int get_maximum_port_number(void);       ///< Maximum valid port number
+    uint32_t get_minimum_port_number(void);  ///< Minimum valid port number
+    uint32_t get_maximum_port_number(void);  ///< Maximum valid port number
     uint32_t get_minimum_client_count(void); ///< Minimum valid client count
 
     int get_initial_test_count(void);        ///< Initial test count

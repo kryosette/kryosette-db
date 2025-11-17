@@ -6,8 +6,7 @@
  * and their corresponding accessor functions.
  */
 
-#include "constants.h"
-#include "server.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/constants.h"
 #include <pthread.h>
 
 // ==================== Server Default Values ====================
@@ -36,6 +35,8 @@ static const pthread_t INITIAL_THREAD_ID = 0;
 // ==================== Client Constants ====================
 
 static const uint32_t INITIAL_CLIENT_COUNT = 0;
+static const size_t MAX_SAFE_CLIENT_COUNT = 100000;
+static const size_t DEFAULT_CLIENT_COUNT = 1000;
 
 // ==================== Utility Constants ====================
 
@@ -96,8 +97,8 @@ static const int TEST_PERSISTENCE_INTERVAL = 60;
 
 static const int INVALID_PORT_NUMBER = 70000;
 static const uint32_t INVALID_CLIENT_COUNT = 0;
-static const int MINIMUM_PORT_NUMBER = 1024;
-static const int MAXIMUM_PORT_NUMBER = 65535;
+static const uint32_t MINIMUM_PORT_NUMBER = 1024;
+static const uint32_t MAXIMUM_PORT_NUMBER = 65535;
 static const uint32_t MINIMUM_CLIENT_COUNT = 1;
 
 static const int INITIAL_TEST_COUNT = 0;
@@ -145,21 +146,21 @@ static const int DEFAULT_PERSISTENCE_INTERVAL = 300; // 5 minutes
 
 // ==================== Server Configuration Default Implementation ====================
 
-server_config_t server_config_default(void)
-{
-    server_config_t config;
-    
-    config.port = get_server_default_port();
-    config.max_clients = get_server_max_clients();
-    config.max_memory = get_default_max_memory();
-    config.mode = get_default_server_mode();
-    config.bind_address = get_default_bind_address();
-    config.data_directory = get_default_data_directory();
-    config.persistence_enabled = get_default_persistence_enabled();
-    config.persistence_interval = get_default_persistence_interval();
-    
-    return config;
-}
+// static server_config_t server_config_default(void)
+// {
+//     server_config_t config;
+
+//     config.port = get_server_default_port();
+//     config.max_clients = get_server_max_clients();
+//     config.max_memory = get_default_max_memory();
+//     config.mode = get_default_server_mode();
+//     config.bind_address = get_default_bind_address();
+//     config.data_directory = get_default_data_directory();
+//     config.persistence_enabled = get_default_persistence_enabled();
+//     config.persistence_interval = get_default_persistence_interval();
+
+//     return config;
+// }
 
 // ==================== Server Default Values Getters ====================
 
@@ -192,6 +193,8 @@ uint32_t get_max_clients_count(const server_config_t *config)
 }
 
 uint32_t get_initial_client_count(void) { return INITIAL_CLIENT_COUNT; }
+size_t get_max_safe_client_count(void) { return MAX_SAFE_CLIENT_COUNT; }
+size_t get_default_client_count(void) { return DEFAULT_CLIENT_COUNT; }
 
 // ==================== Utility Constants Getters ====================
 
@@ -252,8 +255,8 @@ int get_test_persistence_interval(void) { return TEST_PERSISTENCE_INTERVAL; }
 
 int get_invalid_port_number(void) { return INVALID_PORT_NUMBER; }
 uint32_t get_invalid_client_count(void) { return INVALID_CLIENT_COUNT; }
-int get_minimum_port_number(void) { return MINIMUM_PORT_NUMBER; }
-int get_maximum_port_number(void) { return MAXIMUM_PORT_NUMBER; }
+uint32_t get_minimum_port_number(void) { return MINIMUM_PORT_NUMBER; }
+uint32_t get_maximum_port_number(void) { return MAXIMUM_PORT_NUMBER; }
 uint32_t get_minimum_client_count(void) { return MINIMUM_CLIENT_COUNT; }
 
 int get_initial_test_count(void) { return INITIAL_TEST_COUNT; }

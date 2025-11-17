@@ -1,6 +1,12 @@
 {
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
-        "server.h": "c"
+        "server.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "constants.h": "c",
+        "string.h": "c",
+        "pthread.h": "c",
+        "unistd.h": "c"
     }
 }

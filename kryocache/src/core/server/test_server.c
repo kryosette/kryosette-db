@@ -3,11 +3,12 @@
  * @brief Comprehensive test suite for in-memory cache server
  */
 
-#include "server.h"
-#include "constants.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/constants.h"
 #include <stdio.h>
-#include <assert.h>
+#include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 // ==================== Test Constants ====================
 
@@ -59,7 +60,7 @@ int test_server_init_default(void)
 {
     test_header("Server Default Initialization");
 
-    // malloc 6 - создаем сервер с конфигурацией по умолчанию
+    // malloc 1 - создаем сервер с конфигурацией по умолчанию
     server_instance_t *server = server_init_default();
     bool server_created = (server != NULL);
     test_result("Server instance created", server_created);
@@ -78,7 +79,7 @@ int test_server_init_default(void)
         bool status_correct = (server->status == get_initial_server_status());
         test_result("Initial status correct", status_correct);
 
-        // free 6 - освобождаем тестовый сервер
+        // free 1 - освобождаем тестовый сервер
         server_destroy(server);
 
         return server_created && config_valid && storage_created &&
@@ -104,7 +105,7 @@ int test_server_init_custom_config(void)
         .persistence_enabled = get_test_persistence_enabled(),
         .persistence_interval = get_test_persistence_interval()};
 
-    // malloc 7 - создаем сервер с кастомной конфигурацией
+    // malloc 2 - создаем сервер с кастомной конфигурацией
     server_instance_t *server = server_init(&custom_config);
     bool server_created = (server != NULL);
     test_result("Custom server instance created", server_created);
@@ -117,7 +118,7 @@ int test_server_init_custom_config(void)
         bool max_clients_correct = (server->config.max_clients == custom_config.max_clients);
         test_result("Max clients applied", max_clients_correct);
 
-        // free 7 - освобождаем тестовый сервер
+        // free 2 - освобождаем тестовый сервер
         server_destroy(server);
 
         return server_created && config_copied && max_clients_correct ? TEST_SUCCESS : TEST_FAILURE;
@@ -130,12 +131,12 @@ int test_server_init_null_config(void)
 {
     test_header("Server Null Configuration");
 
-    // malloc 8 - попытка создать сервер с NULL конфигом
+    // malloc 3 - попытка создать сервер с NULL конфигом
     server_instance_t *server = server_init(NULL);
     bool server_not_created = (server == NULL);
     test_result("Server not created with NULL config", server_not_created);
 
-    // free 8 не нужен - сервер не создан
+    // free 3 не нужен - сервер не создан
     return server_not_created ? TEST_SUCCESS : TEST_FAILURE;
 }
 
@@ -170,6 +171,11 @@ int test_server_config_validation(void)
     invalid_port_config.port = get_invalid_port_number();
     invalid_clients_config.max_clients = get_invalid_client_count();
 
+    printf("DEBUG: invalid_port=%d, max_port=%d\n",
+           get_invalid_port_number(), get_maximum_port_number());
+    printf("DEBUG: invalid_clients=%u, min_clients=%u\n",
+           get_invalid_client_count(), get_minimum_client_count());
+
     char error_buffer[get_error_buffer_size()];
 
     bool valid_config_passes = server_config_validate(&valid_config, error_buffer, sizeof(error_buffer));
@@ -190,7 +196,7 @@ int test_server_status_management(void)
 {
     test_header("Server Status Management");
 
-    // malloc 9 - создаем сервер для тестирования статусов
+    // malloc 4 - создаем сервер для тестирования статусов
     server_instance_t *server = server_init_default();
     bool server_created = (server != NULL);
     test_result("Server created for status test", server_created);
@@ -209,7 +215,7 @@ int test_server_status_management(void)
         bool error_retrieval_works = (last_error != NULL);
         test_result("Error retrieval works", error_retrieval_works);
 
-        // free 9 - освобождаем тестовый сервер
+        // free 4 - освобождаем тестовый сервер
         server_destroy(server);
 
         return server_created && initial_status_correct &&
@@ -225,7 +231,7 @@ int test_server_stats_collection(void)
 {
     test_header("Server Statistics Collection");
 
-    // malloc 10 - создаем сервер для тестирования статистики
+    // malloc 5 - создаем сервер для тестирования статистики
     server_instance_t *server = server_init_default();
     bool server_created = (server != NULL);
     test_result("Server created for stats test", server_created);
@@ -245,7 +251,7 @@ int test_server_stats_collection(void)
             test_result("Initial client count is zero", initial_clients_zero);
         }
 
-        // free 10 - освобождаем тестовый сервер
+        // free 5 - освобождаем тестовый сервер
         server_destroy(server);
 
         return server_created && stats_retrieved ? TEST_SUCCESS : TEST_FAILURE;
@@ -260,7 +266,7 @@ int test_server_data_operations(void)
 {
     test_header("Server Data Operations");
 
-    // malloc 11 - создаем сервер для тестирования операций с данными
+    // malloc 6 - создаем сервер для тестирования операций с данными
     server_instance_t *server = server_init_default();
     bool server_created = (server != NULL);
     test_result("Server created for data operations test", server_created);
@@ -276,7 +282,7 @@ int test_server_data_operations(void)
         bool load_works = server_load_data(server);
         test_result("Data load operation works", load_works);
 
-        // free 11 - освобождаем тестовый сервер
+        // free 6 - освобождаем тестовый сервер
         server_destroy(server);
 
         return server_created && flush_works && save_works && load_works ? TEST_SUCCESS : TEST_FAILURE;
@@ -298,6 +304,40 @@ int test_server_version_info(void)
     test_result("Build info string is valid", build_info_valid);
 
     return version_valid && build_info_valid ? TEST_SUCCESS : TEST_FAILURE;
+}
+
+// ==================== Memory Safety Tests ====================
+
+int test_server_destroy_safety(void)
+{
+    test_header("Server Destroy Safety");
+
+    // malloc 7 - тестируем безопасное уничтожение
+    server_instance_t *server = server_init_default();
+    bool server_created = (server != NULL);
+    test_result("Server created for destroy test", server_created);
+
+    if (server_created)
+    {
+        // free 7 - безопасное уничтожение
+        server_destroy(server);
+
+        // malloc 8 - тестируем уничтожение NULL
+        server_destroy(NULL);
+
+        // malloc 9 - тестируем двойное уничтожение (should be safe)
+        server_instance_t *server2 = server_init_default();
+        if (server2 != NULL)
+        {
+            server_destroy(server2);
+            server_destroy(server2); // Должно быть безопасно
+        }
+
+        test_result("Destroy operations completed safely", true);
+        return TEST_SUCCESS;
+    }
+
+    return TEST_FAILURE;
 }
 
 // ==================== Main Test Runner ====================
@@ -334,9 +374,23 @@ int main(void)
         test_server_version_info};
     total_failures += run_test_group("Advanced Features Tests", advanced_tests, get_advanced_test_count());
 
+    // Test Group 5: Memory Safety
+    int (*safety_tests[])(void) = {
+        test_server_destroy_safety};
+    total_failures += run_test_group("Memory Safety Tests", safety_tests, 1);
+
     printf("\n🎉 Test Suite Complete!\n");
     printf("=========================================\n");
     printf("Total failures: %d\n", total_failures);
+
+    if (total_failures == get_initial_test_count())
+    {
+        printf("🎊 ALL TESTS PASSED! 🎊\n");
+    }
+    else
+    {
+        printf("⚠️  Some tests failed. Review the output above.\n");
+    }
 
     return total_failures == get_initial_test_count() ? TEST_SUCCESS : TEST_FAILURE;
 }

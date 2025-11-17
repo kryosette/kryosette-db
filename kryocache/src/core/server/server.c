@@ -2,9 +2,9 @@
  * @file server.c
  * @brief High-performance in-memory cache server implementation
  */
-
-#include "server.h"
-#include "constants.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/constants.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/third-party/smemset/include/smemset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,34 +16,78 @@
 #include <time.h>
 #include <strings.h>
 
+// ==================== Internal Thread Functions ====================
+
+static void *server_acceptor_thread(void *arg)
+{
+    server_instance_t *server = (server_instance_t *)arg;
+
+    printf("Acceptor thread started on port %d\n", server->config.port);
+
+    while (server->status == SERVER_STATUS_RUNNING)
+    {
+        sleep(1);
+
+        if (server->status != SERVER_STATUS_RUNNING)
+        {
+            break;
+        }
+    }
+
+    printf("Acceptor thread stopped\n");
+    return NULL;
+}
+
 // ==================== Server Initialization ====================
 
 /*
 You can return the **values** of local variables, but you cannot return **pointers** to local variables!
-*/
-/*
+
 SECURITY MEMORY MANAGEMENT PRINCIPLE
 
-Never return pointers to stack-allocated local variables from functions. 
-When a function exits, its stack frame is destroyed and all local variables become invalid. 
+Never return pointers to stack-allocated local variables from functions.
+When a function exits, its stack frame is destroyed and all local variables become invalid.
 Any pointers referencing them become dangling pointers pointing to garbage memory.
 
 The correct approach is to use static allocation for data that must persist beyond function scope.
-Static variables reside in the data segment, not the stack, ensuring their memory remains valid 
+Static variables reside in the data segment, not the stack, ensuring their memory remains valid
 for the entire program lifetime.
 
 This is fundamental to preventing use-after-return vulnerabilities and memory corruption.
+
+ERRORS:
+✖  static const server_config_t DEFAULT_CONFIG = server_config_default();
+⭡⭡⭡⭡ Error: initializer element is not constant ⭡⭡⭡⭡
+
+Reason: In C, the compiler requires compile-time constant expressions to initialize static const variables.
+The server_config_default() function is executed in runtime, so the compiler cannot calculate its value at the compilation stage.
 */
-server_instance_t *server_init_default(void) {
-    static const server_config_t DEFAULT_CONFIG = server_config_default();
+server_instance_t *server_init_default(void)
+{
+    static server_config_t DEFAULT_CONFIG;
+    static int initialized = 0;
+
+    if (!initialized)
+    {
+        DEFAULT_CONFIG.port = get_server_default_port();
+        DEFAULT_CONFIG.max_clients = get_server_max_clients();
+        DEFAULT_CONFIG.max_memory = get_default_max_memory();
+        DEFAULT_CONFIG.mode = get_default_server_mode();
+        DEFAULT_CONFIG.bind_address = get_default_bind_address();
+        DEFAULT_CONFIG.data_directory = get_default_data_directory();
+        DEFAULT_CONFIG.persistence_enabled = get_default_persistence_enabled();
+        DEFAULT_CONFIG.persistence_interval = get_default_persistence_interval();
+        initialized = 1;
+    }
+
     return server_init(&DEFAULT_CONFIG);
 }
 
-/* 
+/*
 MEMORY INITIALIZATION SAFETY PRINCIPLE
 
 Always initialize allocated memory to a known state before use.
-Uninitialized memory from malloc() contains garbage data which can lead to 
+Uninitialized memory from malloc() contains garbage data which can lead to
 undefined behavior, security vulnerabilities, and difficult-to-debug issues.
 
 The calloc() function automatically zeros memory, providing safe initialization.
@@ -62,7 +106,7 @@ server_instance_t *server_init(const server_config_t *config)
     }
 
     /*
-    MEMORY SAFETY: ZERO-INITIALIZATION  
+    MEMORY SAFETY: ZERO-INITIALIZATION
     Using calloc instead of malloc ensures all fields start as zero/NULL
     This prevents uninitialized pointer issues and garbage data
     */
@@ -90,7 +134,7 @@ server_instance_t *server_init(const server_config_t *config)
     THREAD SAFETY PRINCIPLE: PROTECTION BEFORE DATA
 
     Always initialize synchronization primitives (mutexes, locks) BEFORE making data accessible.
-    When multiple threads can access shared data, the protection mechanism must be fully 
+    When multiple threads can access shared data, the protection mechanism must be fully
     established before any thread can potentially access that data.
 
     Initializing data first and then creating the mutex creates a race condition window where
@@ -128,7 +172,10 @@ server_instance_t *server_init(const server_config_t *config)
     Validate dynamic size calculations to prevent excessive memory allocation
     */
     size_t max_clients = get_max_clients_count(config);
-    if (max_clients == 0 || max_clients > MAX_SAFE_CLIENT_COUNT) {
+    size_t MAX_SAFE_CLIENT_COUNT = get_max_safe_client_count();
+    size_t DEFAULT_CLIENT_COUNT = get_default_client_count();
+    if (max_clients == 0 || max_clients > MAX_SAFE_CLIENT_COUNT)
+    {
         max_clients = DEFAULT_CLIENT_COUNT;
     }
 
@@ -145,7 +192,7 @@ server_instance_t *server_init(const server_config_t *config)
     server->client_count = get_initial_client_count();
 
     /*
-    THREAD SAFETY: CLIENT DATA PROTECTION  
+    THREAD SAFETY: CLIENT DATA PROTECTION
     Initialize client mutex before any client data becomes accessible
     This ensures client operations are thread-safe from the beginning
     */
@@ -162,8 +209,8 @@ server_instance_t *server_init(const server_config_t *config)
     /*
     BUFFER SAFETY PRINCIPLE: BOUNDED STRING COPY
 
-    Never use unbounded string functions like strcpy() which can lead to 
-    buffer overflows and memory corruption. Always use length-limited 
+    Never use unbounded string functions like strcpy() which can lead to
+    buffer overflows and memory corruption. Always use length-limited
     alternatives and explicitly null-terminate the destination buffer.
 
     Buffer overflows can lead to:
@@ -173,10 +220,13 @@ server_instance_t *server_init(const server_config_t *config)
     - Program instability
     */
     const char *error_msg = get_initial_error_message();
-    if (error_msg != NULL) {
+    if (error_msg != NULL)
+    {
         strncpy(server->last_error, error_msg, sizeof(server->last_error) - 1);
         server->last_error[sizeof(server->last_error) - 1] = '\0';
-    } else {
+    }
+    else
+    {
         server->last_error[0] = '\0';
     }
 
@@ -185,9 +235,9 @@ server_instance_t *server_init(const server_config_t *config)
     /*
     RESOURCE TRACKING PRINCIPLE
 
-    In production code, consider tracking all allocated resources for 
-    comprehensive cleanup and leak detection. This becomes especially 
-    important in long-running server applications where resource leaks 
+    In production code, consider tracking all allocated resources for
+    comprehensive cleanup and leak detection. This becomes especially
+    important in long-running server applications where resource leaks
     accumulate over time.
 
     Simple approach: Set a cleanup flag or use RAII patterns
@@ -208,12 +258,12 @@ Recommended cleanup function:
 
 void server_destroy(server_instance_t *server) {
     if (!server) return;
-    
+
     if (server->clients) {
         pthread_mutex_destroy(&server->clients_lock);
         free(server->clients);
     }
-    
+
     if (server->storage) {
         if (server->storage->buckets) {
             pthread_mutex_destroy(&server->storage->lock);
@@ -221,7 +271,7 @@ void server_destroy(server_instance_t *server) {
         }
         free(server->storage);
     }
-    
+
     free(server);
 }
 */
@@ -361,32 +411,67 @@ void server_destroy(server_instance_t *server)
     // free 4 - освобождаем массив клиентов
     if (server->clients != NULL)
     {
+        for (size_t i = 0; i < server->config.max_clients; i++)
+        {
+            if (server->clients[i].socked_fd >= 0)
+            {
+                client_destroy(server->clients[i].fd);
+                server->clients[i].socket_fd = -1;
+            }
+
+            server->clients[i].connected = false;
+
+            /* void *smemset(void *s, int c, size_t n);
+            s: A pointer to the starting address of the memory block to be filled. This is a void* pointer, allowing it to accept pointers to any data type.
+            c: The value to be set. This is passed as an int, but memset uses the unsigned char representation of this value to fill the memory.
+            n: The number of bytes to fill, starting from the address pointed to by s. size_t is an unsigned integral type.
+
+            smemset(&server->clients[i].addr, 0, sizeof(struct sockaddr_in));
+            sizeof: In C (unlike C++), when you declare a structure, you need to use the struct keyword before the name.
+            but I'd rather do a typedef.
+            */
+            smemset(&server->clients[i].addr, 0, sizeof(struct sockaddr_in));
+        }
+
         free(server->clients);
+        server->clients = NULL;
     }
 
     pthread_mutex_destroy(&server->clients_lock);
 
     // free 3 - освобождаем бакеты хранилища
-    if (server->storage != NULL && server->storage->buckets != NULL)
-    {
-        for (size_t i = get_initial_storage_size(); i < server->storage->capacity; i++)
-        {
-            storage_node_t *current = server->storage->buckets[i];
-            while (current != NULL)
-            {
-                storage_node_t *next = current->next;
-                free(current); // free для каждого узла хранилища
-                current = next;
-            }
-        }
-        free(server->storage->buckets);
-    }
-
-    // free 2 - освобождаем структуру хранилища
     if (server->storage != NULL)
     {
+        // Освобождаем все узлы в бакетах
+        if (server->storage->buckets != NULL)
+        {
+            for (size_t i = 0; i < server->storage->capacity; i++) // Начинаем с 0!
+            {
+                storage_node_t *current = server->storage->buckets[i];
+                while (current != NULL)
+                {
+                    storage_node_t *next = current->next;
+                    // Освобождаем ключ и значение, если нужно
+                    if (current->key != NULL)
+                    {
+                        free(current->key);
+                    }
+                    if (current->value != NULL)
+                    {
+                        free(current->value);
+                    }
+                    free(current);
+                    current = next;
+                }
+                server->storage->buckets[i] = NULL;
+            }
+            free(server->storage->buckets);
+            server->storage->buckets = NULL;
+        }
+
         pthread_mutex_destroy(&server->storage->lock);
         free(server->storage);
+        server->storage = NULL; // Важно: обнуляем указатель
     }
 
     // free 1 - освобождаем основную структуру сервера
@@ -463,6 +548,7 @@ bool server_config_validate(const server_config_t *config, char *error_buffer, s
         return false;
     }
 
+    // MINIMUM_PORT_NUMBER = 1024 || MAXIMUM_PORT_NUMBER = 65535
     if (config->port < get_minimum_port_number() || config->port > get_maximum_port_number())
     {
         snprintf(error_buffer, error_size, get_invalid_port_error_message(), config->port);
