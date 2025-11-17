@@ -39,6 +39,21 @@ server_instance_t *server_init_default(void) {
     return server_init(&DEFAULT_CONFIG);
 }
 
+/* 
+MEMORY INITIALIZATION SAFETY PRINCIPLE
+
+Always initialize allocated memory to a known state before use.
+Uninitialized memory from malloc() contains garbage data which can lead to 
+undefined behavior, security vulnerabilities, and difficult-to-debug issues.
+
+The calloc() function automatically zeros memory, providing safe initialization.
+Alternatively, memset() can be used after malloc() to achieve the same effect.
+
+This prevents:
+- Information leaks (uninitialized memory containing sensitive data)
+- Random pointer values causing crashes
+- Non-deterministic behavior from uninitialized variables
+*/
 server_instance_t *server_init(const server_config_t *config)
 {
     if (config == NULL)
@@ -46,8 +61,12 @@ server_instance_t *server_init(const server_config_t *config)
         return NULL;
     }
 
-    // malloc 1
-    server_instance_t *server = (server_instance_t *)malloc(sizeof(server_instance_t));
+    /*
+    MEMORY SAFETY: ZERO-INITIALIZATION  
+    Using calloc instead of malloc ensures all fields start as zero/NULL
+    This prevents uninitialized pointer issues and garbage data
+    */
+    server_instance_t *server = (server_instance_t *)calloc(1, sizeof(server_instance_t));
     if (server == NULL)
     {
         return NULL;
@@ -56,65 +75,156 @@ server_instance_t *server_init(const server_config_t *config)
     server->config = *config;
     server->status = get_initial_server_status();
 
-    // malloc 2
-    server->storage = (storage_t *)malloc(sizeof(storage_t));
+    /*
+    MEMORY SAFETY: CONSISTENT INITIALIZATION
+    Continue using calloc for all allocations to maintain zero-initialized state
+    */
+    server->storage = (storage_t *)calloc(1, sizeof(storage_t));
     if (server->storage == NULL)
     {
-        free(server); // free 1
+        free(server);
         return NULL;
     }
 
+    /*
+    THREAD SAFETY PRINCIPLE: PROTECTION BEFORE DATA
+
+    Always initialize synchronization primitives (mutexes, locks) BEFORE making data accessible.
+    When multiple threads can access shared data, the protection mechanism must be fully 
+    established before any thread can potentially access that data.
+
+    Initializing data first and then creating the mutex creates a race condition window where
+    data is accessible but unprotected. This violates fundamental thread safety requirements.
+    */
+    if (pthread_mutex_init(&server->storage->lock, NULL) != 0)
+    {
+        free(server->storage);
+        free(server);
+        return NULL;
+    }
+
+    /*
+    DATA INITIALIZATION UNDER PROTECTION
+    Now that mutex is established, we can safely initialize the protected data
+    The mutex ensures thread-safe access from this point forward
+    */
     server->storage->capacity = get_initial_storage_capacity();
     server->storage->size = get_initial_storage_size();
 
-    // malloc 3
     server->storage->buckets = (storage_node_t **)calloc(server->storage->capacity, sizeof(storage_node_t *));
     if (server->storage->buckets == NULL)
     {
-        free(server->storage); // free 2
-        free(server);          // free 1
-        return NULL;
-    }
-
-    if (pthread_mutex_init(&server->storage->lock, NULL) != get_mutex_success_code())
-    {
-        free(server->storage->buckets); // free 3
-        free(server->storage);          // free 2
-        free(server);                   // free 1
+        pthread_mutex_destroy(&server->storage->lock);
+        free(server->storage);
+        free(server);
         return NULL;
     }
 
     server->server_fd = get_initial_server_fd();
     server->acceptor_thread = get_initial_thread_id();
 
-    // malloc 4
-    server->clients = (client_context_t *)calloc(get_max_clients_count(config), sizeof(client_context_t));
+    /*
+    MEMORY ALLOCATION SAFETY: SIZE VALIDATION
+    Validate dynamic size calculations to prevent excessive memory allocation
+    */
+    size_t max_clients = get_max_clients_count(config);
+    if (max_clients == 0 || max_clients > MAX_SAFE_CLIENT_COUNT) {
+        max_clients = DEFAULT_CLIENT_COUNT;
+    }
+
+    server->clients = (client_context_t *)calloc(max_clients, sizeof(client_context_t));
     if (server->clients == NULL)
     {
         pthread_mutex_destroy(&server->storage->lock);
-        free(server->storage->buckets); // free 3
-        free(server->storage);          // free 2
-        free(server);                   // free 1
+        free(server->storage->buckets);
+        free(server->storage);
+        free(server);
         return NULL;
     }
 
     server->client_count = get_initial_client_count();
 
-    if (pthread_mutex_init(&server->clients_lock, NULL) != get_mutex_success_code())
+    /*
+    THREAD SAFETY: CLIENT DATA PROTECTION  
+    Initialize client mutex before any client data becomes accessible
+    This ensures client operations are thread-safe from the beginning
+    */
+    if (pthread_mutex_init(&server->clients_lock, NULL) != 0)
     {
-        free(server->clients); // free 4
+        free(server->clients);
         pthread_mutex_destroy(&server->storage->lock);
-        free(server->storage->buckets); // free 3
-        free(server->storage);          // free 2
-        free(server);                   // free 1
+        free(server->storage->buckets);
+        free(server->storage);
+        free(server);
         return NULL;
     }
 
-    strcpy(server->last_error, get_initial_error_message());
+    /*
+    BUFFER SAFETY PRINCIPLE: BOUNDED STRING COPY
+
+    Never use unbounded string functions like strcpy() which can lead to 
+    buffer overflows and memory corruption. Always use length-limited 
+    alternatives and explicitly null-terminate the destination buffer.
+
+    Buffer overflows can lead to:
+    - Stack/heap corruption
+    - Arbitrary code execution
+    - Information disclosure
+    - Program instability
+    */
+    const char *error_msg = get_initial_error_message();
+    if (error_msg != NULL) {
+        strncpy(server->last_error, error_msg, sizeof(server->last_error) - 1);
+        server->last_error[sizeof(server->last_error) - 1] = '\0';
+    } else {
+        server->last_error[0] = '\0';
+    }
+
     server->start_time = get_initial_start_time();
 
+    /*
+    RESOURCE TRACKING PRINCIPLE
+
+    In production code, consider tracking all allocated resources for 
+    comprehensive cleanup and leak detection. This becomes especially 
+    important in long-running server applications where resource leaks 
+    accumulate over time.
+
+    Simple approach: Set a cleanup flag or use RAII patterns
+    Advanced approach: Resource tracking with rollback capabilities
+    */
     return server;
 }
+
+/*
+CLEANUP SAFETY PRINCIPLE
+
+Always provide symmetric cleanup functions that mirror initialization.
+Every allocated resource must have a corresponding deallocation path.
+Cleanup functions should be idempotent (safe to call multiple times)
+and handle partial initialization states gracefully.
+
+Recommended cleanup function:
+
+void server_destroy(server_instance_t *server) {
+    if (!server) return;
+    
+    if (server->clients) {
+        pthread_mutex_destroy(&server->clients_lock);
+        free(server->clients);
+    }
+    
+    if (server->storage) {
+        if (server->storage->buckets) {
+            pthread_mutex_destroy(&server->storage->lock);
+            free(server->storage->buckets);
+        }
+        free(server->storage);
+    }
+    
+    free(server);
+}
+*/
 
 // ==================== Server Control Functions ====================
 
