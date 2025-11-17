@@ -18,10 +18,12 @@
 
 // ==================== Server Initialization ====================
 
-server_instance_t *server_init_default(void)
-{
-    server_config_t default_config = server_config_default();
-    return server_init(&default_config);
+/*
+You can return the **values** of local variables, but you cannot return **pointers** to local variables!
+*/
+server_instance_t *server_init_default(void) {
+    static const server_config_t DEFAULT_CONFIG = server_config_default();
+    return server_init(&DEFAULT_CONFIG);
 }
 
 server_instance_t *server_init(const server_config_t *config)
