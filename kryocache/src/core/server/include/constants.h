@@ -22,6 +22,9 @@ extern "C"
 {
 #endif
 
+    // ==================== Server Configuration Default ====================
+    server_config_t server_config_default(void);          ///< Create default server configuration
+
     // ==================== Server Default Values ====================
     uint16_t get_server_default_port(void);    ///< Default server port (Redis-compatible)
     uint32_t get_server_max_clients(void);     ///< Maximum simultaneous client connections
