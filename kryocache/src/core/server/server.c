@@ -430,7 +430,8 @@ void server_destroy(server_instance_t *server)
             sizeof: In C (unlike C++), when you declare a structure, you need to use the struct keyword before the name.
             but I'd rather do a typedef.
             */
-            smemset(&server->clients[i].addr, 0, sizeof(struct sockaddr_in));
+            sockaddr_in_t addr;
+            smemset(&addr, 0, sizeof(sockaddr_in_t));
         }
 
         free(server->clients);
