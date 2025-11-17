@@ -4,7 +4,7 @@
  */
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/constants.h"
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/third-party/smemset/include/smemset.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/third-party/smemset/include/smemset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -179,6 +179,7 @@ server_instance_t *server_init(const server_config_t *config)
         max_clients = DEFAULT_CLIENT_COUNT;
     }
 
+    server->actual_max_clients = max_clients;
     server->clients = (client_context_t *)calloc(max_clients, sizeof(client_context_t));
     if (server->clients == NULL)
     {
@@ -411,12 +412,19 @@ void server_destroy(server_instance_t *server)
     // free 4 - освобождаем массив клиентов
     if (server->clients != NULL)
     {
-        for (size_t i = 0; i < server->config.max_clients; i++)
+        uint32_t clients_to_clean = server->client_count;
+        if (clients_to_clean > server->actual_max_clients)
         {
-            if (server->clients[i].socked_fd >= 0)
+            clients_to_clean = server->actual_max_clients;
+        }
+
+        for (size_t i = 0; i < clients_to_clean; i++)
+        {
+            if (server->clients[i].fd >= 0)
             {
-                client_destroy(server->clients[i].fd);
-                server->clients[i].socket_fd = -1;
+                // pay attention to safety 💥
+                close(server->clients[i].fd);
+                server->clients[i].fd = -1;
             }
 
             server->clients[i].connected = false;
@@ -430,8 +438,7 @@ void server_destroy(server_instance_t *server)
             sizeof: In C (unlike C++), when you declare a structure, you need to use the struct keyword before the name.
             but I'd rather do a typedef.
             */
-            sockaddr_in_t addr;
-            smemset(&addr, 0, sizeof(sockaddr_in_t));
+            smemset(&server->clients[i].addr, 0, sizeof(sockaddr_in_t));
         }
 
         free(server->clients);
@@ -452,15 +459,6 @@ void server_destroy(server_instance_t *server)
                 while (current != NULL)
                 {
                     storage_node_t *next = current->next;
-                    // Освобождаем ключ и значение, если нужно
-                    if (current->key != NULL)
-                    {
-                        free(current->key);
-                    }
-                    if (current->value != NULL)
-                    {
-                        free(current->value);
-                    }
                     free(current);
                     current = next;
                 }

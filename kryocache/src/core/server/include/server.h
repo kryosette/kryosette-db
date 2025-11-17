@@ -109,6 +109,7 @@ extern "C"
     typedef struct server_instance
     {
         server_config_t config;
+        size_t actual_max_clients;
         server_status_t status;
         storage_t *storage;
         int server_fd;
