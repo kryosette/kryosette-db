@@ -21,6 +21,19 @@
 /*
 You can return the **values** of local variables, but you cannot return **pointers** to local variables!
 */
+/*
+SECURITY MEMORY MANAGEMENT PRINCIPLE
+
+Never return pointers to stack-allocated local variables from functions. 
+When a function exits, its stack frame is destroyed and all local variables become invalid. 
+Any pointers referencing them become dangling pointers pointing to garbage memory.
+
+The correct approach is to use static allocation for data that must persist beyond function scope.
+Static variables reside in the data segment, not the stack, ensuring their memory remains valid 
+for the entire program lifetime.
+
+This is fundamental to preventing use-after-return vulnerabilities and memory corruption.
+*/
 server_instance_t *server_init_default(void) {
     static const server_config_t DEFAULT_CONFIG = server_config_default();
     return server_init(&DEFAULT_CONFIG);
