@@ -1,8 +1,6 @@
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/server.h"
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/constants.h"
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/third-party/smemset/include/smemset.h"
-#include "client.h"
-#include "client_constants.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
