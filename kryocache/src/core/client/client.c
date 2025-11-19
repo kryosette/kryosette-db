@@ -174,7 +174,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     setsockopt(client->sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
     // Attempt connection with retries
-    uint32_t attempt;
+    uint32_t attempt = 0;
     for (attempt = 0; attempt < client->config.max_retries; attempt++)
     {
         if (connect(client->sockfd, (struct sockaddr *)&client->server_addr,
