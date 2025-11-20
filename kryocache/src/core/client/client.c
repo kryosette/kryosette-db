@@ -138,7 +138,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     }
 
     // af_inet = ipv4; sock_stream = tcp
-    client->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    client->sockfd = socket(AF _INET, SOCK_STREAM, 0);
     if (client->sockfd < 0)
     {
         snprintf(client->last_error, sizeof(client->last_error),
