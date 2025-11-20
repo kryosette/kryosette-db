@@ -1,4 +1,4 @@
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/server.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/client.h"
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/constants.h"
 #include "/mnt/c/Users/dmako/kryosette/kryosette-db/third-party/smemset/include/smemset.h"
 #include <stdio.h>
@@ -39,7 +39,9 @@ static client_result_t client_send_command(client_instance_t *client,
         return CLIENT_ERROR_CONNECTION;
     }
 
-    if (response_size == 0 || response_size > MAX_RESPONSE_SIZE)
+    // size_t MAX_RESPONSE_SIZE = get_max_response_size();
+    uint32_t MAX_COMMAND_LENGTH = get_max_command_length();
+    if (response_size == 0 || response_size > get_client_buffer_size())
     {
         return CLIENT_ERROR_INVALID_PARAM;
     }
@@ -129,12 +131,13 @@ cleanup:
  */
 static client_result_t client_establish_connection(client_instance_t *client)
 {
+    // task: consider more errors to eliminate them
     if (client == NULL)
     {
         return CLIENT_ERROR_CONNECTION;
     }
 
-    // Create socket
+    // af_inet = ipv4; sock_stream = tcp
     client->sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (client->sockfd < 0)
     {
@@ -144,14 +147,55 @@ static client_result_t client_establish_connection(client_instance_t *client)
     }
 
     // Configure server address
-    memset(&client->server_addr, 0, sizeof(client->server_addr));
+    /*
+    getaddrinfo(), freeaddrinfo(), gai_strerror():
+           Since glibc 2.22:
+               _POSIX_C_SOURCE >= 200112L
+           glibc 2.21 and earlier:
+               _POSIX_C_SOURCE
+    don't use macros, using compiler flags
+    gcc -D_POSIX_C_SOURCE=200112L -o program program.c
+    # Makefile
+    CFLAGS += -D_POSIX_C_SOURCE=200112L
+
+    struct addrinfo {
+        int ai_flags; // Flags (AI_PASSIVE, etc)
+        int ai_family; // AF_INET, AF_INET6, AF_UNSPEC
+        int ai_socktype; // SOCK_STREAM, SOCK_DGRAM
+        int ai_protocol; // IPPROTO_TCP, etc
+        socklen_t ai_addrlen; // Address length
+        struct sockaddr *ai_addr; // Pointer to the address
+        char *ai_canonname; // Canonical hostname
+        struct addrinfo *ai_next; // Next structure in the list
+    };
+
+    The hints argument points to an addrinfo structure that specifies
+       criteria for selecting the socket address structures returned in
+       the list pointed to by res.
+    If hints is not NULL it points to an
+       addrinfo structure whose ai_family, ai_socktype, and ai_protocol
+       specify criteria that limit the set of socket addresses returned
+       by getaddrinfo()
+    */
+    struct addrinfo hints
+        memset(&client->server_addr, 0, sizeof(client->server_addr));
     client->server_addr.sin_family = AF_INET;
     client->server_addr.sin_port = htons(client->config.port);
 
     // Resolve hostname to IP address
+    /*
+    int inet_pton(int af, const char *restrict src, void *restrict dst);
+
+    *a function for converting a string with an IP address to a binary format
+    This function converts the character string src into a network
+       address structure in the af address family, then copies the
+       network address structure to dst.  The af argument must be either
+       AF_INET or AF_INET6.  dst is written in network byte order.
+    */
     if (inet_pton(AF_INET, client->config.host, &client->server_addr.sin_addr) <= 0)
     {
-        struct hostent *he = gethostbyname(client->config.host);
+        // gethostbyname - deprecated! don't use this!
+        // struct hostent *he = gethostbyname(client->config.host);
         if (he == NULL)
         {
             snprintf(client->last_error, sizeof(client->last_error),
@@ -164,7 +208,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     }
 
     // Set socket timeout
-    struct timeval timeout;
+    struct timeval timeout = 0;
     timeout.tv_sec = client->config.timeout_ms / 1000;
     timeout.tv_usec = (client->config.timeout_ms % 1000) * 1000;
 

@@ -22,7 +22,7 @@ extern "C"
     uint32_t get_client_default_timeout(void); ///< Default operation timeout
     uint32_t get_client_max_retries(void);     ///< Maximum connection retries
     bool get_client_auto_reconnect(void);      ///< Default auto-reconnect setting
-    uint32_t get_max_command_length(void);
+    uint32_t get_max_command_length(void);     ///< Maximum command length
 
     // ==================== Network Constants ====================
     uint32_t get_client_buffer_size(void);      ///< I/O buffer size

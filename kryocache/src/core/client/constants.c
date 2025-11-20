@@ -1,10 +1,9 @@
-
 /**
  * @file client_constants.c
  * @brief Client constants implementation
  */
 
-#include "client_constants.h"
+#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/constants.h"
 #include <string.h>
 
 // ==================== Client Default Values ====================
@@ -43,6 +42,10 @@ static const char *CLIENT_ERROR_MEMORY = "Memory allocation failed";
 static const char *TEST_CLIENT_HOST = "localhost";
 static const uint32_t TEST_CLIENT_PORT = 6898;
 static const uint32_t TEST_CLIENT_TIMEOUT = 1000;
+
+// ==================== Response Size Constants ====================
+
+static const size_t MAX_RESPONSE_SIZE = 1048576; // 1MB
 
 // ==================== Client Configuration Default Implementation ====================
 
@@ -96,3 +99,7 @@ const char *get_client_error_memory(void) { return CLIENT_ERROR_MEMORY; }
 const char *get_test_client_host(void) { return TEST_CLIENT_HOST; }
 uint32_t get_test_client_port(void) { return TEST_CLIENT_PORT; }
 uint32_t get_test_client_timeout(void) { return TEST_CLIENT_TIMEOUT; }
+
+// ==================== Response Size Getters ====================
+
+size_t get_max_response_size(void) { return MAX_RESPONSE_SIZE; }

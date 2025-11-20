@@ -1,4 +1,3 @@
-
 /**
  * @file client.h
  * @brief High-performance in-memory cache client implementation
@@ -33,7 +32,6 @@ extern "C"
      */
     typedef enum
     {
-        CLIENT_ERROR_INVALID_PARAM, /**< Client is  */
         CLIENT_STATUS_DISCONNECTED, /**< Client is disconnected */
         CLIENT_STATUS_CONNECTING,   /**< Client is establishing connection */
         CLIENT_STATUS_CONNECTED,    /**< Client is connected and ready */
@@ -45,12 +43,13 @@ extern "C"
      */
     typedef enum
     {
-        CLIENT_SUCCESS,          /**< Operation completed successfully */
-        CLIENT_ERROR_CONNECTION, /**< Connection error */
-        CLIENT_ERROR_TIMEOUT,    /**< Operation timeout */
-        CLIENT_ERROR_PROTOCOL,   /**< Protocol error */
-        CLIENT_ERROR_SERVER,     /**< Server returned error */
-        CLIENT_ERROR_MEMORY      /**< Memory allocation error */
+        CLIENT_SUCCESS,            /**< Operation completed successfully */
+        CLIENT_ERROR_CONNECTION,   /**< Connection error */
+        CLIENT_ERROR_TIMEOUT,      /**< Operation timeout */
+        CLIENT_ERROR_PROTOCOL,     /**< Protocol error */
+        CLIENT_ERROR_SERVER,       /**< Server returned error */
+        CLIENT_ERROR_MEMORY,       /**< Memory allocation error */
+        CLIENT_ERROR_INVALID_PARAM /**< Invalid parameter error */
     } client_result_t;
 
     /**
