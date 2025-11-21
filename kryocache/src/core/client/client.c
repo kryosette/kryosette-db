@@ -137,6 +137,10 @@ static client_result_t client_establish_connection(client_instance_t *client)
         return CLIENT_ERROR_CONNECTION;
     }
 
+    struct in6_addr ipv6_addr;
+    if (inet_pton(AF_INET6, client->config)) {
+      
+    }
     // af_inet = ipv4; sock_stream = tcp
     client->sockfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (client->sockfd < 0)
@@ -179,7 +183,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     */
     struct addrinfo hints;
     struct addrinfo *result, *rp;
-    memset(&client->server_addr, 0, sizeof(client->server_addr));
+    smemset(&client->server_addr, 0, sizeof(client->server_addr));
     client->server_addr.ai_family = AF_INET6;
     client->server_addr.socktype = SOCK_STREAM;
     client->server_addr.ai_port = htons(client->config.port);
