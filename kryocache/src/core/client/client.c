@@ -138,7 +138,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     }
 
     // af_inet = ipv4; sock_stream = tcp
-    client->sockfd = socket(AF _INET, SOCK_STREAM, 0);
+    client->sockfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (client->sockfd < 0)
     {
         snprintf(client->last_error, sizeof(client->last_error),
@@ -177,10 +177,12 @@ static client_result_t client_establish_connection(client_instance_t *client)
        specify criteria that limit the set of socket addresses returned
        by getaddrinfo()
     */
-    struct addrinfo hints
-        memset(&client->server_addr, 0, sizeof(client->server_addr));
-    client->server_addr.sin_family = AF_INET;
-    client->server_addr.sin_port = htons(client->config.port);
+    struct addrinfo hints;
+    struct addrinfo *result, *rp;
+    memset(&client->server_addr, 0, sizeof(client->server_addr));
+    client->server_addr.ai_family = AF_INET6;
+    client->server_addr.socktype = SOCK_STREAM;
+    client->server_addr.ai_port = htons(client->config.port);
 
     // Resolve hostname to IP address
     /*
