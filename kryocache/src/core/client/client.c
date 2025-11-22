@@ -137,10 +137,19 @@ static client_result_t client_establish_connection(client_instance_t *client)
         return CLIENT_ERROR_CONNECTION;
     }
 
+    /*
+    struct in6_addr {
+        unsigned char   s6_addr[16];  IPv6 address
+    };
+    */
     struct in6_addr ipv6_addr;
-    if (inet_pton(AF_INET6, client->config)) {
-      
+    if (inet_pton(AF_INET6, client->config.host, &ipv6_addr) != 1)
+    {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Invalid IPv6 address: %s", client->config.host);
+        return CLIENT_ERROR_PROTOCOL;
     }
+
     // af_inet = ipv4; sock_stream = tcp
     client->sockfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (client->sockfd < 0)
@@ -198,7 +207,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
        network address structure to dst.  The af argument must be either
        AF_INET or AF_INET6.  dst is written in network byte order.
     */
-    if (inet_pton(AF_INET, client->config.host, &client->server_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET6, client->config.host, &client->server_addr.sin_addr) <= 0)
     {
         // gethostbyname - deprecated! don't use this!
         // struct hostent *he = gethostbyname(client->config.host);
