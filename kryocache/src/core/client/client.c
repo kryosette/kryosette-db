@@ -189,14 +189,22 @@ static client_result_t client_establish_connection(client_instance_t *client)
        addrinfo structure whose ai_family, ai_socktype, and ai_protocol
        specify criteria that limit the set of socket addresses returned
        by getaddrinfo()
-    */
-    struct addrinfo hints;
-    struct addrinfo *result, *rp;
-    smemset(&client->server_addr, 0, sizeof(client->server_addr));
-    client->server_addr.ai_family = AF_INET6;
-    client->server_addr.socktype = SOCK_STREAM;
-    client->server_addr.ai_port = htons(client->config.port);
 
+    but! I only use ipv6 without dns
+
+    struct sockaddr_in6 {
+        sa_family_t     sin6_family;   /* AF_INET6
+        in_port_t sin6_port;       /* port number
+        uint32_t sin6_flowinfo;    /* IPv6 flow information
+        struct in6_addr sin6_addr; /* IPv6 address
+        uint32_t sin6_scope_id;    /* Scope ID (new in Linux 2.4)
+    };
+    */
+    struct sockaddr_in6 server_addr;
+    smemset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin6_family = AF_INET6;
+    server_addr.sin6_port = htons(client->config.port);
+    memcpy(&server_addr.sin6_addr, &ipv6_addr, sizeof(ipv6_addr));
     // Resolve hostname to IP address
     /*
     int inet_pton(int af, const char *restrict src, void *restrict dst);
@@ -207,7 +215,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
        network address structure to dst.  The af argument must be either
        AF_INET or AF_INET6.  dst is written in network byte order.
     */
-    if (inet_pton(AF_INET6, client->config.host, &client->server_addr.sin_addr) <= 0)
+    if (inet_pton(AF_INET6, client->config.host, &server_addr->sin6_addr) <= 0)
     {
         // gethostbyname - deprecated! don't use this!
         // struct hostent *he = gethostbyname(client->config.host);
@@ -227,6 +235,12 @@ static client_result_t client_establish_connection(client_instance_t *client)
     timeout.tv_sec = client->config.timeout_ms / 1000;
     timeout.tv_usec = (client->config.timeout_ms % 1000) * 1000;
 
+    /*
+    int setsockopt(socklen_t optlen;
+                      int sockfd, int level, int optname,
+                      const void optval[optlen],
+                      socklen_t optlen);
+    */
     setsockopt(client->sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(client->sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
