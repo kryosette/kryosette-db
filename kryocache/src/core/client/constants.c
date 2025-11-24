@@ -8,7 +8,7 @@
 
 // ==================== Client Default Values ====================
 
-static const char *CLIENT_DEFAULT_HOST = "127.0.0.1";
+static const char *CLIENT_DEFAULT_HOST = "::1";
 static const uint32_t CLIENT_DEFAULT_PORT = 6898;
 static const uint32_t CLIENT_DEFAULT_TIMEOUT = 5000; // 5 seconds
 static const uint32_t CLIENT_MAX_RETRIES = 3;
@@ -32,10 +32,10 @@ static const client_status_t INITIAL_CLIENT_STATUS = CLIENT_STATUS_DISCONNECTED;
 
 // ==================== Error Messages ====================
 
-static const char *CLIENT_ERROR_CONNECTION = "Connection failed";
-static const char *CLIENT_ERROR_TIMEOUT = "Operation timeout";
-static const char *CLIENT_ERROR_PROTOCOL = "Protocol error";
-static const char *CLIENT_ERROR_MEMORY = "Memory allocation failed";
+static const char *CLIENT_ERRMSG_CONNECTION = "Connection failed";
+static const char *CLIENT_ERRMSG_TIMEOUT = "Operation timeout";
+static const char *CLIENT_ERRMSG_PROTOCOL = "Protocol error";
+static const char *CLIENT_ERRMSG_MEMORY = "Memory allocation failed";
 
 // ==================== Test Constants ====================
 
@@ -49,16 +49,16 @@ static const size_t MAX_RESPONSE_SIZE = 1048576; // 1MB
 
 // ==================== Client Configuration Default Implementation ====================
 
-client_config_t client_config_default(void)
-{
-    client_config_t config;
-    config.host = get_client_default_host();
-    config.port = get_client_default_port();
-    config.timeout_ms = get_client_default_timeout();
-    config.max_retries = get_client_max_retries();
-    config.auto_reconnect = get_client_auto_reconnect();
-    return config;
-}
+// client_config_t client_config_default(void)
+// {
+//     client_config_t config;
+//     config.host = get_client_default_host();
+//     config.port = get_client_default_port();
+//     config.timeout_ms = get_client_default_timeout();
+//     config.max_retries = get_client_max_retries();
+//     config.auto_reconnect = get_client_auto_reconnect();
+//     return config;
+// }
 
 // ==================== Client Default Values Getters ====================
 
@@ -89,10 +89,11 @@ client_status_t get_initial_client_status(void) { return INITIAL_CLIENT_STATUS; 
 
 // ==================== Error Messages Getters ====================
 
-const char *get_client_error_connection(void) { return CLIENT_ERROR_CONNECTION; }
-const char *get_client_error_timeout(void) { return CLIENT_ERROR_TIMEOUT; }
-const char *get_client_error_protocol(void) { return CLIENT_ERROR_PROTOCOL; }
-const char *get_client_error_memory(void) { return CLIENT_ERROR_MEMORY; }
+// ИЗМЕНЕНО: обновлены имена функций для соответствия новым константам
+const char *get_client_error_connection(void) { return CLIENT_ERRMSG_CONNECTION; }
+const char *get_client_error_timeout(void) { return CLIENT_ERRMSG_TIMEOUT; }
+const char *get_client_error_protocol(void) { return CLIENT_ERRMSG_PROTOCOL; }
+const char *get_client_error_memory(void) { return CLIENT_ERRMSG_MEMORY; }
 
 // ==================== Test Constants Getters ====================
 

@@ -13,6 +13,11 @@
 #include <errno.h>
 #include <time.h>
 
+#include <sys/time.h> // для struct timeval
+#include <fcntl.h>    // для fcntl, F_GETFL, F_SETFL, O_NONBLOCK
+#include <poll.h>     // для poll, struct pollfd, POLLOUT, POLLERR и т.д.
+#include <sys/select.h>
+
 // ==================== Internal Protocol Functions ====================
 
 /**
@@ -378,7 +383,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
         if (errno == EINPROGRESS || errno == EALREADY)
         {
             // select\poll
-            if (check_connection_complete(client->sockfd, client->config.timeout_ms))
+            if (check_connection_complete_poll(client->sockfd, client->config.timeout_ms))
             {
                 // Restore blocking mode before returning
                 fcntl(client->sockfd, F_SETFL, flags);

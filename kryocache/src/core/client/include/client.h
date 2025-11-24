@@ -143,6 +143,7 @@ extern "C"
     const client_config_t *client_get_config(const client_instance_t *client);
     const char *client_get_last_error(const client_instance_t *client);
     bool client_is_connected(const client_instance_t *client);
+    static bool check_connection_complete_poll(int sockfd, int timeout_ms);
 
     /** @} */
 
