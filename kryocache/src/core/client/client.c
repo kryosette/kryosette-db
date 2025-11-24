@@ -201,7 +201,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     };
     */
     struct sockaddr_in6 server_addr;
-    smemset(&server_addr, 0, sizeof(server_addr));
+    memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin6_family = AF_INET6;
     server_addr.sin6_port = htons(client->config.port);
     memcpy(&server_addr.sin6_addr, &ipv6_addr, sizeof(ipv6_addr));
@@ -215,27 +215,31 @@ static client_result_t client_establish_connection(client_instance_t *client)
        network address structure to dst.  The af argument must be either
        AF_INET or AF_INET6.  dst is written in network byte order.
     */
-    if (inet_pton(AF_INET6, client->config.host, &server_addr->sin6_addr) <= 0)
-    {
-        // gethostbyname - deprecated! don't use this!
-        // struct hostent *he = gethostbyname(client->config.host);
-        if (he == NULL)
-        {
-            snprintf(client->last_error, sizeof(client->last_error),
-                     "Host resolution failed for: %s", client->config.host);
-            close(client->sockfd);
-            client->sockfd = -1;
-            return CLIENT_ERROR_CONNECTION;
-        }
-        memcpy(&client->server_addr.sin_addr, he->h_addr_list[0], he->h_length);
-    }
+    // if (inet_pton(AF_INET6, client->config.host, &server_addr->sin6_addr) <= 0)
+    // {
+    //     // gethostbyname - deprecated! don't use this!
+    //     // struct hostent *he = gethostbyname(client->config.host);
+    //     if (he == NULL)
+    //     {
+    //         snprintf(client->last_error, sizeof(client->last_error),
+    //                  "Host resolution failed for: %s", client->config.host);
+    //         close(client->sockfd);
+    //         client->sockfd = -1;
+    //         return CLIENT_ERROR_CONNECTION;
+    //     }
+    //     memcpy(&client->server_addr.sin_addr, he->h_addr_list[0], he->h_length);
+    // }
+
+    memcpy(&client->server_addr, &server_addr, sizeof(server_addr));
 
     // Set socket timeout
-    struct timeval timeout = 0;
+    struct timeval timeout = {0};
     timeout.tv_sec = client->config.timeout_ms / 1000;
     timeout.tv_usec = (client->config.timeout_ms % 1000) * 1000;
 
     /*
+    setsockopt — set the socket options
+
     int setsockopt(socklen_t optlen;
                       int sockfd, int level, int optname,
                       const void optval[optlen],
@@ -244,17 +248,171 @@ static client_result_t client_establish_connection(client_instance_t *client)
     setsockopt(client->sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     setsockopt(client->sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
+    /*
+           #include <fcntl.h>
+
+       int fcntl(int fd, int op, ...);
+
+       DESCRIPTION
+
+       fcntl() performs one of the operations described below on the open
+       file descriptor fd.  The operation is determined by op.
+
+       Certain of the operations below are supported only since a
+       particular Linux kernel version.  The preferred method of checking
+       whether the host kernel supports a particular operation is to
+       invoke fcntl() with the desired op value and then test whether the
+       call failed with EINVAL, indicating that the kernel does not
+    */
+    int flags = fcntl(client->sockfd, F_GETFL, 0);
+    fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK);
+
     // Attempt connection with retries
     uint32_t attempt = 0;
+    client_result_t final_result = CLIENT_ERROR_CONNECTION;
+
     for (attempt = 0; attempt < client->config.max_retries; attempt++)
     {
-        if (connect(client->sockfd, (struct sockaddr *)&client->server_addr,
-                    sizeof(client->server_addr)) == 0)
+        int connect_result = connect(client->sockfd, (struct sockaddr *)&client->server_addr,
+                                     sizeof(client->server_addr));
+
+        if (connect_result == 0)
         {
+            // Restore blocking mode before returning
+            fcntl(client->sockfd, F_SETFL, flags);
+
             client->status = CLIENT_STATUS_CONNECTED;
             client->connect_time = time(NULL);
             client->last_activity = client->connect_time;
             return CLIENT_SUCCESS;
+        }
+
+        /*
+        The following are general socket errors only.  There may be other
+       domain-specific error codes.
+
+       EACCES For UNIX domain sockets, which are identified by pathname:
+              Write permission is denied on the socket file, or search
+              permission is denied for one of the directories in the path
+              prefix.  (See also path_resolution(7).)
+
+       EACCES
+       EPERM  The user tried to connect to a broadcast address without
+              having the socket broadcast flag enabled or the connection
+              request failed because of a local firewall rule.
+
+       EACCES It can also be returned if an SELinux policy denied a
+              connection (for example, if there is a policy saying that
+              an HTTP proxy can only connect to ports associated with
+              HTTP servers, and the proxy tries to connect to a different
+              port).
+
+       EADDRINUSE
+              Local address is already in use.
+
+       EADDRNOTAVAIL
+              (Internet domain sockets) The socket referred to by sockfd
+              had not previously been bound to an address and, upon
+              attempting to bind it to an ephemeral port, it was
+              determined that all port numbers in the ephemeral port
+              range are currently in use.  See the discussion of
+              /proc/sys/net/ipv4/ip_local_port_range in ip(7).
+
+       EAFNOSUPPORT
+              The passed address didn't have the correct address family
+              in its sa_family field.
+
+       EAGAIN For nonblocking UNIX domain sockets, the socket is
+              nonblocking, and the connection cannot be completed
+              immediately.  For other socket families, there are
+              insufficient entries in the routing cache.
+
+       EALREADY
+              The socket is nonblocking and a previous connection attempt
+              has not yet been completed.
+
+       EBADF  sockfd is not a valid open file descriptor.
+
+       ECONNREFUSED
+              A connect() on a stream socket found no one listening on
+              the remote address.
+
+       EFAULT The socket structure address is outside the user's address
+              space.
+
+       EINPROGRESS
+              The socket is nonblocking and the connection cannot be
+              completed immediately.  (UNIX domain sockets failed with
+              EAGAIN instead.)  It is possible to select(2) or poll(2)
+              for completion by selecting the socket for writing.  After
+              select(2) indicates writability, use getsockopt(2) to read
+              the SO_ERROR option at level SOL_SOCKET to determine
+              whether connect() completed successfully (SO_ERROR is zero)
+              or unsuccessfully (SO_ERROR is one of the usual error codes
+              listed here, explaining the reason for the failure).
+
+       EINTR  The system call was interrupted by a signal that was
+              caught; see signal(7).
+
+       EISCONN
+              The socket is already connected.
+
+       ENETUNREACH
+              Network is unreachable.
+
+       ENOTSOCK
+              The file descriptor sockfd does not refer to a socket.
+
+       EPROTOTYPE
+              The socket type does not support the requested
+              communications protocol.  This error can occur, for
+              example, on an attempt to connect a UNIX domain datagram
+              socket to a stream socket.
+
+       ETIMEDOUT
+              Timeout while attempting connection.  The server may be too
+              busy to accept new connections.  Note that for IP sockets
+              the timeout may be very long when syncookies are enabled on
+              the server.
+        */
+        if (errno == EINPROGRESS || errno == EALREADY)
+        {
+            // select\poll
+            if (check_connection_complete(client->sockfd, client->config.timeout_ms))
+            {
+                // Restore blocking mode before returning
+                fcntl(client->sockfd, F_SETFL, flags);
+
+                client->status = CLIENT_STATUS_CONNECTED;
+                client->connect_time = time(NULL);
+                client->last_activity = client->connect_time;
+                return CLIENT_SUCCESS;
+            }
+        }
+        else if (errno == EISCONN)
+        {
+            // Restore blocking mode before returning
+            fcntl(client->sockfd, F_SETFL, flags);
+
+            client->status = CLIENT_STATUS_CONNECTED;
+            client->connect_time = time(NULL);
+            client->last_activity = client->connect_time;
+            return CLIENT_SUCCESS;
+        }
+        // Check for temporary errors that are worth retrying
+        else if (errno == ECONNREFUSED || errno == ETIMEDOUT ||
+                 errno == ENETUNREACH || errno == EHOSTUNREACH)
+        {
+            // These are temporary errors - continue to next attempt
+            final_result = CLIENT_ERROR_CONNECTION;
+        }
+        else
+        {
+            // Critical error that shouldn't be retried
+            snprintf(client->last_error, sizeof(client->last_error),
+                     "Critical connection error: %s", strerror(errno));
+            final_result = CLIENT_ERROR_CONNECTION;
+            break;
         }
 
         if (attempt < client->config.max_retries - 1)
@@ -263,12 +421,175 @@ static client_result_t client_establish_connection(client_instance_t *client)
         }
     }
 
-    snprintf(client->last_error, sizeof(client->last_error),
-             "Connection failed after %d attempts: %s",
-             client->config.max_retries, strerror(errno));
-    close(client->sockfd);
-    client->sockfd = -1;
-    return CLIENT_ERROR_CONNECTION;
+    // Restore blocking mode before returning error
+    fcntl(client->sockfd, F_SETFL, flags);
+
+    if (final_result != CLIENT_SUCCESS)
+    {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Connection failed after %d attempts: %s",
+                 client->config.max_retries, strerror(errno));
+        close(client->sockfd);
+        client->sockfd = -1;
+    }
+
+    return final_result;
+}
+
+/*
+select() allows a program to monitor multiple file descriptors,
+       waiting until one or more of the file descriptors become "ready"
+       for some class of I/O operation (e.g., input possible).  A file
+       descriptor is considered ready if it is possible to perform a
+       corresponding I/O operation (e.g., read(2), or a sufficiently
+       small write(2)) without blocking.
+
+int select(int nfds, fd_set *_Nullable restrict readfds,
+           fd_set *_Nullable restrict writefds,
+           fd_set *_Nullable restrict exceptfds,
+           struct timeval *_Nullable restrict timeout);
+
+void FD_CLR(int fd, fd_set *set);
+int FD_ISSET(int fd, fd_set *set);
+void FD_SET(int fd, fd_set *set);
+void FD_ZERO(fd_set *set);
+
+int pselect(int nfds, fd_set *_Nullable restrict readfds,
+            fd_set *_Nullable restrict writefds,
+            fd_set *_Nullable restrict exceptfds,
+            const struct timespec *_Nullable restrict timeout,
+            const sigset_t *_Nullable restrict sigmask);
+
+   Feature Test Macro Requirements for glibc (see
+   feature_test_macros(7)):
+
+       pselect():
+           _POSIX_C_SOURCE >= 200112L
+
+WARNING: select() can monitor only file descriptors numbers that
+       are less than FD_SETSIZE (1024)—an unreasonably low limit for many
+       modern applications—and this limitation will not change.  All
+       modern applications should instead use poll(2) or epoll(7), which
+       do not suffer this limitation.
+
+---------------------------------------------------------------------------
+   fd_set
+       A structure type that can represent a set of file descriptors.
+       According to POSIX, the maximum number of file descriptors in an
+       fd_set structure is the value of the macro FD_SETSIZE.
+*/
+// static bool check_connection_complete(int sockfd, int timeout_ms)
+// {
+//     fd_set write_fds, error_fds;
+//     struct timeval tv = {0};
+//     int result = -1;
+
+//     // MACROS WARNING
+//     // void FD_ZERO(fd_set *set);
+//     /*
+//     This macro clears (removes all file descriptors from) set.
+//               It should be employed as the first step in initializing a
+//               file descriptor set
+//     */
+//     FD_ZERO(&write_fds);
+//     FD_ZERO(&error_fds);
+//     // void FD_SET(int fd, fd_set *set);
+//     FD_SET(sockfd, &write_fds);
+//     FD_SET(sockfd, &error_fds);
+
+//     tv.tv_sec = timeout_ms / 1000;           // Integer number of seconds
+//     tv.tv_usec = (timeout_ms % 1000) * 1000; // Remainder in microseconds
+// }
+
+// ▶ but I will use poll, it is more modern and more controlled.
+
+/*
+int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+
+#define _GNU_SOURCE         //  See feature_test_macros(7)
+#include <poll.h>
+
+int ppoll(struct pollfd *fds, nfds_t nfds,
+          const struct timespec *_Nullable tmo_p,
+          const sigset_t *_Nullable sigmask);
+
+poll() performs a similar task to select(2): it waits for one of a
+       set of file descriptors to become ready to perform I/O.  The
+       Linux-specific epoll(7) API performs a similar task, but offers
+       features beyond those found in poll().
+
+       The set of file descriptors to be monitored is specified in the
+       fds argument, which is an array of structures of the following
+       form:
+
+        struct pollfd {
+            int   fd;         / file descriptor /
+            short events;  / requested events /
+            short revents; / returned events /
+        }
+*/
+static bool check_connection_complete_poll(int sockfd, int timeout_ms)
+{
+    struct pollfd pfd = {0};
+    int result = -1;
+
+    pfd.fd = sockfd;
+    /*
+        POLLOUT
+            Writing is now possible, though a write larger than the
+            available space in a socket or pipe will still block
+            (unless O_NONBLOCK is set).
+    */
+    pfd.events = POLLOUT; // We are waiting for the socket to become writable
+    pfd.revents = 0;
+
+    // int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+    result = poll(&pfd, 1, timeout_ms);
+
+    if (result < 0 || result == 0)
+    {
+        return false;
+    }
+
+    /*
+    The field *EVENTS* is an input parameter, a bit mask specifying the
+       events the application is interested in for the file descriptor
+       fd.  This field may be specified as zero, in which case the only
+       events that can be returned in *REVENTS* are POLLHUP, POLLERR, and
+       POLLNVAL (see below).
+
+    The field revents is an output parameter, filled by the kernel
+       with the events that actually occurred.  The bits returned in
+       revents can include any of those specified in events, or one of
+       the values POLLERR, POLLHUP, or POLLNVAL.  (These three bits are
+       meaningless in the events field, and will be set in the revents
+       field whenever the corresponding condition is true.)
+    */
+    if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))
+    {
+        return false;
+    }
+
+    if (pfd.revents & POLLOUT)
+    {
+        int so_error = 0;
+        socklen_t len = sizeof(so_error);
+
+        /*
+        int getsockopt(socklen *restrict optlen;
+                      int sockfd, int level, int optname,
+                      void optval[_Nullable restrict *optlen],
+                      socklen_t *restrict optlen);
+        */
+        if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &so_error, &len) < 0)
+        {
+            return false;
+        }
+
+        return (so_error == 0);
+    }
+
+    return false;
 }
 
 // ==================== Core Client API Implementation ====================
