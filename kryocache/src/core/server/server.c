@@ -294,7 +294,7 @@ bool server_start(server_instance_t *server)
     server->status = SERVER_STATUS_STARTING;
 
     // malloc 5 - создание сокета
-    server->server_fd = socket(AF_INET, SOCK_STREAM, get_socket_protocol());
+    server->server_fd = socket(AF_INET6, SOCK_STREAM, get_socket_protocol());
     if (server->server_fd < get_socket_success_code())
     {
         server->status = SERVER_STATUS_ERROR;
@@ -311,10 +311,10 @@ bool server_start(server_instance_t *server)
         return false;
     }
 
-    struct sockaddr_in server_address;
-    server_address.sin_family = get_socket_domain();
-    server_address.sin_port = htons(server->config.port);
-    server_address.sin_addr.s_addr = get_socket_bind_address();
+    struct sockaddr_in6 server_address;
+    server_address.sin6_family = get_socket_domain();
+    server_address.sin6_port = htons(server->config.port);
+    server_address.sin6_addr = in6addr_any;
 
     if (bind(server->server_fd, (struct sockaddr *)&server_address,
              sizeof(server_address)) < get_socket_success_code())

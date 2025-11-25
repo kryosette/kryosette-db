@@ -1,0 +1,1 @@
+1) If the shutdown is successful, the error message must be cleared.

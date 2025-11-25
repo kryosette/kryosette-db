@@ -82,15 +82,15 @@ extern "C"
      */
     typedef struct client_instance
     {
-        client_config_t config;         /**< Client configuration */
-        client_status_t status;         /**< Current connection status */
-        int sockfd;                     /**< Socket file descriptor */
-        struct sockaddr_in server_addr; /**< Server address */
-        pthread_mutex_t lock;           /**< Client operation lock */
-        client_stats_t stats;           /**< Client statistics */
-        char last_error[256];           /**< Last error message */
-        time_t connect_time;            /**< Connection establishment time */
-        time_t last_activity;           /**< Last operation time */
+        client_config_t config;          /**< Client configuration */
+        client_status_t status;          /**< Current connection status */
+        int sockfd;                      /**< Socket file descriptor */
+        struct sockaddr_in6 server_addr; /**< Server address */
+        pthread_mutex_t lock;            /**< Client operation lock */
+        client_stats_t stats;            /**< Client statistics */
+        char last_error[256];            /**< Last error message */
+        time_t connect_time;             /**< Connection establishment time */
+        time_t last_activity;            /**< Last operation time */
     } client_instance_t;
 
     /** @} */

@@ -269,7 +269,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
        invoke fcntl() with the desired op value and then test whether the
        call failed with EINVAL, indicating that the kernel does not
 
-       ERRORS        
+       ERRORS
        EACCES or EAGAIN
               Operation is prohibited by locks held by other processes.
 
@@ -278,15 +278,16 @@ static client_result_t client_establish_connection(client_instance_t *client)
 
        EBADF  fd is not an open file descriptor
 
-       EINVAL The value specified in op is not recognized by this kernel.         
+       EINVAL The value specified in op is not recognized by this kernel.
     */
     int flags = fcntl(client->sockfd, F_GETFL, 0);
     fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK);
 
-    if (flags == -1) {
-        errno = EINVAL;
-        return -1;
-    }
+    // if (flags == -1)
+    // {
+    //     errno = EINVAL;
+    //     return -1;
+    // }
     // Attempt connection with retries
     uint32_t attempt = 0;
     client_result_t final_result = CLIENT_ERROR_CONNECTION;
@@ -700,6 +701,22 @@ client_instance_t *client_init(const client_config_t *config)
     return client;
 }
 
+/*
+    typedef enum
+    {
+        CLIENT_SUCCESS,            /**< Operation completed successfully
+        CLIENT_ERROR_CONNECTION,   /**< Connection error
+        CLIENT_ERROR_TIMEOUT,      /**< Operation timeout
+        CLIENT_ERROR_PROTOCOL,     /**< Protocol error
+        CLIENT_ERROR_SERVER,       /**< Server returned error
+        CLIENT_ERROR_MEMORY,       /**< Memory allocation error
+        CLIENT_ERROR_INVALID_PARAM /**< Invalid parameter error
+    }
+    client_result_t;
+
+    If the shutdown is successful, the error message must be cleared.
+client->last_error[0] = '\0'; // clear
+*/
 client_result_t client_connect(client_instance_t *client)
 {
     if (client == NULL)
@@ -716,21 +733,31 @@ client_result_t client_connect(client_instance_t *client)
     }
 
     client->status = CLIENT_STATUS_CONNECTING;
-    pthread_mutex_unlock(&client->lock);
 
     client_result_t result = client_establish_connection(client);
 
-    pthread_mutex_lock(&client->lock);
-    if (result != CLIENT_SUCCESS)
+    if (result == CLIENT_SUCCESS)
+    {
+        client->status = CLIENT_STATUS_CONNECTED;
+        client->connect_time = time(NULL);
+        client->last_activity = client->connect_time;
+        client->last_error[0] = '\0'; // Clearing the error on success
+    }
+    else
     {
         client->status = CLIENT_STATUS_ERROR;
         client->stats.operations_failed++;
     }
+
     pthread_mutex_unlock(&client->lock);
 
     return result;
 }
 
+/*
+If the shutdown is successful, the error message must be cleared.
+client->last_error[0] = '\0'; // clear
+*/
 client_result_t client_disconnect(client_instance_t *client)
 {
     if (client == NULL)
@@ -760,6 +787,8 @@ client_result_t client_disconnect(client_instance_t *client)
     }
 
     client->status = CLIENT_STATUS_DISCONNECTED;
+    client->last_error[0] = '\0'; // clear
+
     pthread_mutex_unlock(&client->lock);
 
     return CLIENT_SUCCESS;
