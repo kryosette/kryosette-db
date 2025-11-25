@@ -268,10 +268,24 @@ static client_result_t client_establish_connection(client_instance_t *client)
        whether the host kernel supports a particular operation is to
        invoke fcntl() with the desired op value and then test whether the
        call failed with EINVAL, indicating that the kernel does not
+
+       ERRORS        
+       EACCES or EAGAIN
+              Operation is prohibited by locks held by other processes.
+
+       EAGAIN The operation is prohibited because the file has been
+              memory-mapped by another process.
+
+       EBADF  fd is not an open file descriptor
+
+       EINVAL The value specified in op is not recognized by this kernel.         
     */
     int flags = fcntl(client->sockfd, F_GETFL, 0);
     fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK);
 
+    if (flags == ) {
+      
+    }
     // Attempt connection with retries
     uint32_t attempt = 0;
     client_result_t final_result = CLIENT_ERROR_CONNECTION;
