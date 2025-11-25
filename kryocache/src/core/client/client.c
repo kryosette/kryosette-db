@@ -283,8 +283,9 @@ static client_result_t client_establish_connection(client_instance_t *client)
     int flags = fcntl(client->sockfd, F_GETFL, 0);
     fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK);
 
-    if (flags == ) {
-      
+    if (flags == -1) {
+        errno = EINVAL;
+        return -1;
     }
     // Attempt connection with retries
     uint32_t attempt = 0;
