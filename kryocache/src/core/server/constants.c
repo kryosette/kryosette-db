@@ -144,24 +144,6 @@ static const char *DEFAULT_DATA_DIRECTORY = "./data";
 static const bool DEFAULT_PERSISTENCE_ENABLED = false;
 static const int DEFAULT_PERSISTENCE_INTERVAL = 300; // 5 minutes
 
-// ==================== Server Configuration Default Implementation ====================
-
-// static server_config_t server_config_default(void)
-// {
-//     server_config_t config;
-
-//     config.port = get_server_default_port();
-//     config.max_clients = get_server_max_clients();
-//     config.max_memory = get_default_max_memory();
-//     config.mode = get_default_server_mode();
-//     config.bind_address = get_default_bind_address();
-//     config.data_directory = get_default_data_directory();
-//     config.persistence_enabled = get_default_persistence_enabled();
-//     config.persistence_interval = get_default_persistence_interval();
-
-//     return config;
-// }
-
 // ==================== Server Default Values Getters ====================
 
 uint16_t get_server_default_port(void) { return SERVER_DEFAULT_PORT; }
