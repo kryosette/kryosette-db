@@ -123,7 +123,7 @@ extern "C"
     client_result_t client_get(client_instance_t *client,
                                const char *key,
                                char *value_buffer,
-                               size_t buffer_size);
+                               size_t buffer_size);q
     client_result_t client_delete(client_instance_t *client, const char *key);
     client_result_t client_exists(client_instance_t *client, const char *key);
     client_result_t client_flush(client_instance_t *client);
@@ -137,7 +137,7 @@ extern "C"
      * @defgroup client_info Client Information
      * @{
      */
-
+    
     client_status_t client_get_status(const client_instance_t *client);
     bool client_get_stats(const client_instance_t *client, client_stats_t *stats);
     const client_config_t *client_get_config(const client_instance_t *client);

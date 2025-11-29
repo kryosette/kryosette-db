@@ -685,7 +685,6 @@ client_instance_t *client_init(const client_config_t *config)
         return NULL;
     }
 
-    // Initialize statistics
     client->stats.operations_total = 0;
     client->stats.operations_failed = 0;
     client->stats.bytes_sent = 0;
@@ -693,7 +692,6 @@ client_instance_t *client_init(const client_config_t *config)
     client->stats.reconnect_count = 0;
     client->stats.connection_time_seconds = 0.0;
 
-    // Initialize error buffer and timestamps
     client->last_error[0] = '\0';
     client->connect_time = 0;
     client->last_activity = 0;
