@@ -501,6 +501,17 @@ int main(int argc, char *argv[])
     int opt;
     int option_index = 0;
 
+    /*
+    int getopt_long(int argc, char * const argv[],
+           const char *optstring,
+           const struct option *longopts, int *longindex);
+
+    The getopt() function parses the command-line arguments. 
+    Its arguments argc and argv are the argument count and array as passed to the main() function on program invocation. 
+    An element of argv that starts with '-' (and is not exactly "-" or "--") is an option element. 
+    The characters of this element (aside from the initial '-') are option characters. 
+    If getopt() is called repeatedly, it returns successively each of the option characters from each of the option elements.
+    */
     while ((opt = getopt_long(argc, argv, "h:p:t:v", long_options, &option_index)) != -1)
     {
         switch (opt)
