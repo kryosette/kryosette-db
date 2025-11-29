@@ -9,5 +9,6 @@
         "pthread.h": "c",
         "unistd.h": "c",
         "cstdint": "c"
-    }
+    },
+    "cmake.sourceDirectory": "C:/Users/dmako/kryosette/kryosette-db/third-party"
 }
