@@ -3,7 +3,7 @@
  * @brief Client constants implementation
  */
 
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/constants.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/constants.h"
 #include <string.h>
 
 // ==================== Client Default Values ====================

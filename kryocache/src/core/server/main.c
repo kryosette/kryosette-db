@@ -3,7 +3,7 @@
  * @brief Server main entry point
  */
 
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/server.h"
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
@@ -52,9 +52,9 @@ int main()
     }
 
     // Set up callbacks
-    server_set_connect_callback(g_server, on_client_connect, NULL);
-    server_set_disconnect_callback(g_server, on_client_disconnect, NULL);
-    server_set_command_callback(g_server, on_command, NULL);
+    // server_set_connect_callback(g_server, on_client_connect, NULL);
+    // server_set_disconnect_callback(g_server, on_client_disconnect, NULL);
+    // server_set_command_callback(g_server, on_command, NULL);
 
     // Start the server
     if (!server_start(g_server))

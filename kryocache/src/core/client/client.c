@@ -1,6 +1,6 @@
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/client.h"
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/constants.h"
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/third-party/smemset/include/smemset.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/client.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/constants.h"
+#include "/Users/dimaeremin/kryosette-db/third-party/smemset/include/smemset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +17,94 @@
 #include <fcntl.h>    // для fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <poll.h>     // для poll, struct pollfd, POLLOUT, POLLERR и т.д.
 #include <sys/select.h>
+
+// Forward declarations (temp)
+static client_result_t client_establish_connection(client_instance_t *client);
+static bool check_connection_complete_poll(int sockfd, int timeout_ms);
+
+
+/*
+CLIENT LIFECYCLE MANAGEMENT PRINCIPLE
+
+Client instances follow a strict lifecycle:
+1. INIT: Memory allocation and configuration
+2. CONNECT: Network establishment and handshake
+3. OPERATE: Command execution (thread-safe)
+4. DISCONNECT: Graceful connection teardown
+5. DESTROY: Resource cleanup
+
+Each phase must handle partial failure states and ensure
+no resource leaks occur during error recovery.
+*/
+client_instance_t *client_init_default(void)
+{
+    static client_config_t DEFAULT_CONFIG;
+    static int initialized = 0;
+
+    if (!initialized)
+    {
+        DEFAULT_CONFIG.host = get_client_default_host();
+        DEFAULT_CONFIG.port = get_client_default_port();
+        DEFAULT_CONFIG.timeout_ms = get_client_default_timeout();
+        DEFAULT_CONFIG.max_retries = get_client_max_retries();
+        DEFAULT_CONFIG.auto_reconnect = get_client_auto_reconnect();
+        initialized = 1;
+    }
+
+    return client_init(&DEFAULT_CONFIG);
+}
+
+client_instance_t *client_init(const client_config_t *config)
+{
+    if (config == NULL)
+    {
+        return NULL;
+    }
+
+    /*
+    MEMORY SAFETY: ZERO-INITIALIZATION
+    Using calloc ensures all pointer fields start as NULL and numeric fields as 0.
+    This prevents accessing uninitialized memory and simplifies cleanup logic.
+    */
+    client_instance_t *client = (client_instance_t *)calloc(1, sizeof(client_instance_t));
+    if (client == NULL)
+    {
+        return NULL;
+    }
+
+    // Copy configuration (shallow copy for now)
+    client->config = *config;
+    client->status = get_initial_client_status();
+    client->sockfd = -1; // Invalid socket descriptor
+
+    /*
+    THREAD SAFETY: OPERATION ISOLATION
+
+    The client mutex protects all network operations to ensure:
+    - Only one command executes at a time
+    - Response boundaries are preserved
+    - Statistics updates are atomic
+    - Connection state changes are synchronized
+    */
+    if (pthread_mutex_init(&client->lock, NULL) != 0)
+    {
+        free(client);
+        return NULL;
+    }
+
+    client->stats.operations_total = 0;
+    client->stats.operations_failed = 0;
+    client->stats.bytes_sent = 0;
+    client->stats.bytes_received = 0;
+    client->stats.reconnect_count = 0;
+    client->stats.connection_time_seconds = 0.0;
+
+    client->last_error[0] = '\0';
+    client->connect_time = 0;
+    client->last_activity = 0;
+
+    return client;
+}
 
 // ==================== Internal Protocol Functions ====================
 
@@ -136,29 +224,74 @@ cleanup:
  */
 static client_result_t client_establish_connection(client_instance_t *client)
 {
+    printf("DEBUG: Starting connection to %s:%u\n", client->config.host, client->config.port);
+    
     // task: consider more errors to eliminate them
     if (client == NULL)
     {
+        printf("DEBUG: client is NULL\n");
         return CLIENT_ERROR_CONNECTION;
+    }
+
+    // Проверка хоста
+    if (client->config.host == NULL || client->config.host[0] == '\0') {
+        printf("DEBUG: Host is NULL or empty\n");
+        snprintf(client->last_error, sizeof(client->last_error),
+                "Host is NULL or empty");
+        return CLIENT_ERROR_PROTOCOL;
     }
 
     /*
     struct in6_addr {
         unsigned char   s6_addr[16];  IPv6 address
     };
+
+    AF_INET6
+              src points to a character string containing an IPv6 network
+              address.  The address is converted to a struct in6_addr and
+              copied to dst, which must be sizeof(struct in6_addr) (16)
+              bytes (128 bits) long.  The allowed formats for IPv6
+              addresses follow these rules:
+
+              •  The preferred format is x:x:x:x:x:x:x:x.  This form
+                 consists of eight hexadecimal numbers, each of which
+                 expresses a 16-bit value (i.e., each x can be up to 4
+                 hex digits).
+
+              •  A series of contiguous zero values in the preferred
+                 format can be abbreviated to ::.  Only one instance of
+                 :: can occur in an address.  For example, the loopback
+                 address 0:0:0:0:0:0:0:1 can be abbreviated as ::1.  The
+                 wildcard address, consisting of all zeros, can be
+                 written as ::.
+
+              •  An alternate format is useful for expressing IPv4-mapped
+                 IPv6 addresses.  This form is written as
+                 x:x:x:x:x:x:d.d.d.d, where the six leading xs are
+                 hexadecimal values that define the six most-significant
+                 16-bit pieces of the address (i.e., 96 bits), and the ds
+                 express a value in dotted-decimal notation that defines
+                 the least significant 32 bits of the address.  An
+                 example of such an address is ::FFFF:204.152.189.116.
+
     */
     struct in6_addr ipv6_addr;
+    printf("DEBUG: Calling inet_pton for host: %s\n", client->config.host);
     if (inet_pton(AF_INET6, client->config.host, &ipv6_addr) != 1)
     {
+        printf("DEBUG: inet_pton FAILED for host: %s\n", client->config.host);
         snprintf(client->last_error, sizeof(client->last_error),
-                 "Invalid IPv6 address: %s", client->config.host);
+                "Invalid IPv6 address: %s", client->config.host);
         return CLIENT_ERROR_PROTOCOL;
     }
+    printf("DEBUG: inet_pton SUCCESS\n");
 
     // af_inet = ipv4; sock_stream = tcp
     client->sockfd = socket(AF_INET6, SOCK_STREAM, 0);
+    printf("DEBUG: Socket created: %d\n", client->sockfd);
     if (client->sockfd < 0)
     {
+        printf("DEBUG: Socket creation FAILED: %s\n", strerror(errno));
         snprintf(client->last_error, sizeof(client->last_error),
                  "Socket creation failed: %s", strerror(errno));
         return CLIENT_ERROR_CONNECTION;
@@ -210,6 +343,9 @@ static client_result_t client_establish_connection(client_instance_t *client)
     server_addr.sin6_family = AF_INET6;
     server_addr.sin6_port = htons(client->config.port);
     memcpy(&server_addr.sin6_addr, &ipv6_addr, sizeof(ipv6_addr));
+    printf("DEBUG: Server address configured: family=%d, port=%d\n", 
+           server_addr.sin6_family, ntohs(server_addr.sin6_port));
+
     // Resolve hostname to IP address
     /*
     int inet_pton(int af, const char *restrict src, void *restrict dst);
@@ -241,6 +377,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
     struct timeval timeout = {0};
     timeout.tv_sec = client->config.timeout_ms / 1000;
     timeout.tv_usec = (client->config.timeout_ms % 1000) * 1000;
+    printf("DEBUG: Timeout set: %ld sec %ld usec\n", timeout.tv_sec, timeout.tv_usec);
 
     /*
     setsockopt — set the socket options
@@ -250,8 +387,13 @@ static client_result_t client_establish_connection(client_instance_t *client)
                       const void optval[optlen],
                       socklen_t optlen);
     */
-    setsockopt(client->sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-    setsockopt(client->sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+    if (setsockopt(client->sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        printf("DEBUG: SO_RCVTIMEO setsockopt failed: %s\n", strerror(errno));
+    }
+    if (setsockopt(client->sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+        printf("DEBUG: SO_SNDTIMEO setsockopt failed: %s\n", strerror(errno));
+    }
+    printf("DEBUG: Socket options set\n");
 
     /*
            #include <fcntl.h>
@@ -281,7 +423,12 @@ static client_result_t client_establish_connection(client_instance_t *client)
        EINVAL The value specified in op is not recognized by this kernel.
     */
     int flags = fcntl(client->sockfd, F_GETFL, 0);
-    fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK);
+    printf("DEBUG: Original socket flags: %d\n", flags);
+    if (fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        printf("DEBUG: Setting O_NONBLOCK failed: %s\n", strerror(errno));
+    } else {
+        printf("DEBUG: Socket set to non-blocking mode\n");
+    }
 
     // if (flags == -1)
     // {
@@ -292,15 +439,26 @@ static client_result_t client_establish_connection(client_instance_t *client)
     uint32_t attempt = 0;
     client_result_t final_result = CLIENT_ERROR_CONNECTION;
 
+    printf("DEBUG: Starting connection attempts (max_retries=%u)\n", client->config.max_retries);
+    
     for (attempt = 0; attempt < client->config.max_retries; attempt++)
     {
+        printf("DEBUG: Connection attempt %d/%d\n", attempt + 1, client->config.max_retries);
         int connect_result = connect(client->sockfd, (struct sockaddr *)&client->server_addr,
                                      sizeof(client->server_addr));
 
+        printf("DEBUG: connect() returned: %d, errno: %d (%s)\n", 
+               connect_result, errno, strerror(errno));
+        
         if (connect_result == 0)
         {
+            printf("DEBUG: Connection SUCCESS on attempt %d\n", attempt + 1);
             // Restore blocking mode before returning
-            fcntl(client->sockfd, F_SETFL, flags);
+            if (fcntl(client->sockfd, F_SETFL, flags) < 0) {
+                printf("DEBUG: WARNING: Failed to restore blocking mode: %s\n", strerror(errno));
+            } else {
+                printf("DEBUG: Socket restored to blocking mode\n");
+            }
 
             client->status = CLIENT_STATUS_CONNECTED;
             client->connect_time = time(NULL);
@@ -398,9 +556,11 @@ static client_result_t client_establish_connection(client_instance_t *client)
         */
         if (errno == EINPROGRESS || errno == EALREADY)
         {
+            printf("DEBUG: Connection in progress, checking with poll...\n");
             // select\poll
             if (check_connection_complete_poll(client->sockfd, client->config.timeout_ms))
             {
+                printf("DEBUG: Poll check SUCCESS\n");
                 // Restore blocking mode before returning
                 fcntl(client->sockfd, F_SETFL, flags);
 
@@ -409,9 +569,14 @@ static client_result_t client_establish_connection(client_instance_t *client)
                 client->last_activity = client->connect_time;
                 return CLIENT_SUCCESS;
             }
+            else
+            {
+                printf("DEBUG: Poll check FAILED\n");
+            }
         }
         else if (errno == EISCONN)
         {
+            printf("DEBUG: Socket already connected\n");
             // Restore blocking mode before returning
             fcntl(client->sockfd, F_SETFL, flags);
 
@@ -424,12 +589,14 @@ static client_result_t client_establish_connection(client_instance_t *client)
         else if (errno == ECONNREFUSED || errno == ETIMEDOUT ||
                  errno == ENETUNREACH || errno == EHOSTUNREACH)
         {
+            printf("DEBUG: Temporary error (will retry): %s\n", strerror(errno));
             // These are temporary errors - continue to next attempt
             final_result = CLIENT_ERROR_CONNECTION;
         }
         else
         {
             // Critical error that shouldn't be retried
+            printf("DEBUG: Critical error: %s\n", strerror(errno));
             snprintf(client->last_error, sizeof(client->last_error),
                      "Critical connection error: %s", strerror(errno));
             final_result = CLIENT_ERROR_CONNECTION;
@@ -438,15 +605,19 @@ static client_result_t client_establish_connection(client_instance_t *client)
 
         if (attempt < client->config.max_retries - 1)
         {
-            usleep(100000 * (1 << attempt)); // Exponential backoff
+            int backoff_ms = 100 * (1 << attempt);
+            printf("DEBUG: Backoff %d ms before next attempt\n", backoff_ms);
+            usleep(backoff_ms * 1000); // Exponential backoff
         }
     }
 
     // Restore blocking mode before returning error
+    printf("DEBUG: All connection attempts failed, restoring blocking mode\n");
     fcntl(client->sockfd, F_SETFL, flags);
 
     if (final_result != CLIENT_SUCCESS)
     {
+        printf("DEBUG: Final connection result: FAILED\n");
         snprintf(client->last_error, sizeof(client->last_error),
                  "Connection failed after %d attempts: %s",
                  client->config.max_retries, strerror(errno));
@@ -616,90 +787,6 @@ static bool check_connection_complete_poll(int sockfd, int timeout_ms)
 // ==================== Core Client API Implementation ====================
 
 /*
-CLIENT LIFECYCLE MANAGEMENT PRINCIPLE
-
-Client instances follow a strict lifecycle:
-1. INIT: Memory allocation and configuration
-2. CONNECT: Network establishment and handshake
-3. OPERATE: Command execution (thread-safe)
-4. DISCONNECT: Graceful connection teardown
-5. DESTROY: Resource cleanup
-
-Each phase must handle partial failure states and ensure
-no resource leaks occur during error recovery.
-*/
-
-client_instance_t *client_init_default(void)
-{
-    static client_config_t DEFAULT_CONFIG;
-    static int initialized = 0;
-
-    if (!initialized)
-    {
-        DEFAULT_CONFIG.host = get_client_default_host();
-        DEFAULT_CONFIG.port = get_client_default_port();
-        DEFAULT_CONFIG.timeout_ms = get_client_default_timeout();
-        DEFAULT_CONFIG.max_retries = get_client_max_retries();
-        DEFAULT_CONFIG.auto_reconnect = get_client_auto_reconnect();
-        initialized = 1;
-    }
-
-    return client_init(&DEFAULT_CONFIG);
-}
-
-client_instance_t *client_init(const client_config_t *config)
-{
-    if (config == NULL)
-    {
-        return NULL;
-    }
-
-    /*
-    MEMORY SAFETY: ZERO-INITIALIZATION
-    Using calloc ensures all pointer fields start as NULL and numeric fields as 0.
-    This prevents accessing uninitialized memory and simplifies cleanup logic.
-    */
-    client_instance_t *client = (client_instance_t *)calloc(1, sizeof(client_instance_t));
-    if (client == NULL)
-    {
-        return NULL;
-    }
-
-    // Copy configuration (shallow copy for now)
-    client->config = *config;
-    client->status = get_initial_client_status();
-    client->sockfd = -1; // Invalid socket descriptor
-
-    /*
-    THREAD SAFETY: OPERATION ISOLATION
-
-    The client mutex protects all network operations to ensure:
-    - Only one command executes at a time
-    - Response boundaries are preserved
-    - Statistics updates are atomic
-    - Connection state changes are synchronized
-    */
-    if (pthread_mutex_init(&client->lock, NULL) != 0)
-    {
-        free(client);
-        return NULL;
-    }
-
-    client->stats.operations_total = 0;
-    client->stats.operations_failed = 0;
-    client->stats.bytes_sent = 0;
-    client->stats.bytes_received = 0;
-    client->stats.reconnect_count = 0;
-    client->stats.connection_time_seconds = 0.0;
-
-    client->last_error[0] = '\0';
-    client->connect_time = 0;
-    client->last_activity = 0;
-
-    return client;
-}
-
-/*
     typedef enum
     {
         CLIENT_SUCCESS,            /**< Operation completed successfully
@@ -723,7 +810,7 @@ client_result_t client_connect(client_instance_t *client)
     }
 
     pthread_mutex_lock(&client->lock);
-
+    
     if (client->status == CLIENT_STATUS_CONNECTED)
     {
         pthread_mutex_unlock(&client->lock);

@@ -6,7 +6,7 @@
  * and their corresponding accessor functions.
  */
 
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/constants.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/constants.h"
 #include <pthread.h>
 
 // ==================== Server Default Values ====================

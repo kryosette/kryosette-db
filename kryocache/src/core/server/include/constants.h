@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/server.h"
 
 /**
  * @file constants.h

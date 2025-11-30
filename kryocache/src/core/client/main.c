@@ -7,8 +7,8 @@
  * with comprehensive error handling and user-friendly output.
  */
 
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/client.h"
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/client/include/client_constants.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/client.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/constants.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

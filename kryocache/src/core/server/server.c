@@ -2,9 +2,9 @@
  * @file server.c
  * @brief High-performance in-memory cache server implementation
  */
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/server.h"
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/kryocache/src/core/server/include/constants.h"
-#include "/mnt/c/Users/dmako/kryosette/kryosette-db/third-party/smemset/include/smemset.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/server.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/constants.h"
+#include "/Users/dimaeremin/kryosette-db/third-party/smemset/include/smemset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +15,74 @@
 #include <signal.h>
 #include <time.h>
 #include <strings.h>
+#include <arpa/inet.h>    
+#include <errno.h>      
+
+
+static void handle_client_connection(int client_fd)
+{
+    char buffer[1024];
+    ssize_t bytes_read;
+    
+    bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    
+    if (bytes_read > 0) {
+        buffer[bytes_read] = '\0';
+        printf("Received command: %s", buffer);
+        
+        char *command = buffer;
+        if (command[bytes_read - 2] == '\r' && command[bytes_read - 1] == '\n') {
+            command[bytes_read - 2] = '\0';
+        } else if (command[bytes_read - 1] == '\n') {
+            command[bytes_read - 1] = '\0';
+        }
+
+        if (strcmp(command, "PING") == 0) {
+            const char *response = "PONG\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent PONG response\n");
+        }
+        else if (strcmp(command, "FLUSH") == 0) {
+            const char *response = "OK\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent FLUSH OK response\n");
+        }
+        else if (strncmp(command, "SET ", 4) == 0) {
+            const char *response = "OK\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent SET OK response\n");
+        }
+        else if (strncmp(command, "GET ", 4) == 0) {
+            const char *response = "VALUE example_value\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent GET response\n");
+        }
+        else if (strncmp(command, "DELETE ", 7) == 0) {
+            const char *response = "OK\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent DELETE OK response\n");
+        }
+        else if (strncmp(command, "EXISTS ", 7) == 0) {
+            const char *response = "1\r\n"; // 1 = exists, 0 = not exists
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent EXISTS response\n");
+        }
+        else if (strcmp(command, "STATS") == 0) {
+            const char *response = "STATS: 0 keys, 0 clients, 0s uptime\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent STATS response\n");
+        }
+        else {
+            const char *response = "ERROR Unknown command\r\n";
+            send(client_fd, response, strlen(response), 0);
+            printf("Sent ERROR response for unknown command\n");
+        }
+    } else {
+        printf("Client disconnected or error reading command\n");
+    }
+    
+    close(client_fd);
+}
 
 // ==================== Internal Thread Functions ====================
 
@@ -26,17 +94,54 @@ static void *server_acceptor_thread(void *arg)
 
     while (server->status == SERVER_STATUS_RUNNING)
     {
-        sleep(1);
+        /*
+            struct sockaddr_in6 {
+               sa_family_t     sin6_family;    AF_INET6 
+               in_port_t       sin6_port;      port number 
+               uint32_t        sin6_flowinfo;  IPv6 flow information 
+               struct in6_addr sin6_addr;     IPv6 address 
+               uint32_t        sin6_scope_id;  Scope ID (new in Linux 2.4) 
+            };
 
-        if (server->status != SERVER_STATUS_RUNNING)
-        {
+            struct in6_addr {
+               unsigned char   s6_addr[16];   IPv6 address 
+            };
+        */
+        struct sockaddr_in6 client_addr;
+        socklen_t client_len = sizeof(client_addr);
+
+        /*
+        #include <sys/socket.h>
+
+        int accept(int sockfd, struct sockaddr *_Nullable restrict addr,
+                  socklen_t *_Nullable restrict addrlen);
+
+        #define _GNU_SOURCE              See feature_test_macros(7) 
+        #include <sys/socket.h>
+
+        int accept4(int sockfd, struct sockaddr *_Nullable restrict addr,
+                  socklen_t *_Nullable restrict addrlen, int flags);
+        */
+        int client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_addr);
+
+        if (client_fd >= 0) {
+            char client_ip[INET6_ADDRSTRLEN];
+            inet_ntop(AF_INET6, &client_addr.sin6_addr, client_ip, sizeof(client_ip));
+            printf("New client connected from %s:%d\n", client_ip, ntohs(client_addr.sin6_port));
+            
+            handle_client_connection(client_fd);
+        } else if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            perror("accept failed");
             break;
         }
+
+        usleep(100000);
     }
 
     printf("Acceptor thread stopped\n");
     return NULL;
 }
+
 
 // ==================== Server Initialization ====================
 
