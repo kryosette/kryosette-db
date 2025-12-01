@@ -5,6 +5,7 @@
 #include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/server.h"
 #include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/include/constants.h"
 #include "/Users/dimaeremin/kryosette-db/third-party/smemset/include/smemset.h"
+#include "/Users/dimaeremin/kryosette-db/kryocache/src/core/server/commands/include/commands.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,8 @@
 #include <strings.h>
 #include <arpa/inet.h>    
 #include <errno.h>      
+
+static void *server_acceptor_thread(void *arg);
 
 // ==================== Internal Thread Functions ====================
 
@@ -56,7 +59,8 @@ static void *server_acceptor_thread(void *arg)
         int accept4(int sockfd, struct sockaddr *_Nullable restrict addr,
                   socklen_t *_Nullable restrict addrlen, int flags);
         */
-        int client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_addr);
+        socklen_t client_len = sizeof(client_addr);
+        int client_fd = accept(server->server_fd, (struct sockaddr*)&client_addr, &client_len);
 
         if (client_fd >= 0) {
             char client_ip[INET6_ADDRSTRLEN];
