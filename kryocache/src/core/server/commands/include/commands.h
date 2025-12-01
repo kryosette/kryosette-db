@@ -16,6 +16,7 @@ typedef struct {
     size_t size;
 } storage_db_t;
 
+// warning
 static storage_db_t g_storage = {0};
 
 // temp (improve!)

@@ -189,7 +189,7 @@ bool storage_set(const char *key, const char *value) {
         node = node->next;
     }
 
-    storage_node_db_t *new_node = malloc(sizeof(storage_node_db_t));
+    storage_node_db_t *new_node = calloc(sizeof(storage_node_db_t));
     if (!new_node) return false;
     /*
     The strdup() function returns a pointer to a new string which is a
@@ -214,7 +214,7 @@ const char *storage_get(const char *key) {
     storage_node_db_t *node = g_storage.buckets[index];
     
     while (node) {
-        if (strcmp(node->key, key) == 0) {
+        if (strncmp(node->key, key) == 0) {
             return node->value;
         }
         node = node->next;

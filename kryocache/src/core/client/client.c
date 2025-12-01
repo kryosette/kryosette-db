@@ -224,18 +224,13 @@ cleanup:
  */
 static client_result_t client_establish_connection(client_instance_t *client)
 {
-    printf("DEBUG: Starting connection to %s:%u\n", client->config.host, client->config.port);
-    
     // task: consider more errors to eliminate them
     if (client == NULL)
     {
-        printf("DEBUG: client is NULL\n");
         return CLIENT_ERROR_CONNECTION;
     }
 
-    // Проверка хоста
     if (client->config.host == NULL || client->config.host[0] == '\0') {
-        printf("DEBUG: Host is NULL or empty\n");
         snprintf(client->last_error, sizeof(client->last_error),
                 "Host is NULL or empty");
         return CLIENT_ERROR_PROTOCOL;
@@ -276,22 +271,17 @@ static client_result_t client_establish_connection(client_instance_t *client)
 
     */
     struct in6_addr ipv6_addr;
-    printf("DEBUG: Calling inet_pton for host: %s\n", client->config.host);
     if (inet_pton(AF_INET6, client->config.host, &ipv6_addr) != 1)
     {
-        printf("DEBUG: inet_pton FAILED for host: %s\n", client->config.host);
         snprintf(client->last_error, sizeof(client->last_error),
                 "Invalid IPv6 address: %s", client->config.host);
         return CLIENT_ERROR_PROTOCOL;
     }
-    printf("DEBUG: inet_pton SUCCESS\n");
 
     // af_inet = ipv4; sock_stream = tcp
     client->sockfd = socket(AF_INET6, SOCK_STREAM, 0);
-    printf("DEBUG: Socket created: %d\n", client->sockfd);
     if (client->sockfd < 0)
     {
-        printf("DEBUG: Socket creation FAILED: %s\n", strerror(errno));
         snprintf(client->last_error, sizeof(client->last_error),
                  "Socket creation failed: %s", strerror(errno));
         return CLIENT_ERROR_CONNECTION;
@@ -343,8 +333,6 @@ static client_result_t client_establish_connection(client_instance_t *client)
     server_addr.sin6_family = AF_INET6;
     server_addr.sin6_port = htons(client->config.port);
     memcpy(&server_addr.sin6_addr, &ipv6_addr, sizeof(ipv6_addr));
-    printf("DEBUG: Server address configured: family=%d, port=%d\n", 
-           server_addr.sin6_family, ntohs(server_addr.sin6_port));
 
     // Resolve hostname to IP address
     /*
@@ -377,7 +365,6 @@ static client_result_t client_establish_connection(client_instance_t *client)
     struct timeval timeout = {0};
     timeout.tv_sec = client->config.timeout_ms / 1000;
     timeout.tv_usec = (client->config.timeout_ms % 1000) * 1000;
-    printf("DEBUG: Timeout set: %ld sec %ld usec\n", timeout.tv_sec, timeout.tv_usec);
 
     /*
     setsockopt — set the socket options
@@ -393,7 +380,6 @@ static client_result_t client_establish_connection(client_instance_t *client)
     if (setsockopt(client->sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
         printf("DEBUG: SO_SNDTIMEO setsockopt failed: %s\n", strerror(errno));
     }
-    printf("DEBUG: Socket options set\n");
 
     /*
            #include <fcntl.h>
@@ -423,7 +409,6 @@ static client_result_t client_establish_connection(client_instance_t *client)
        EINVAL The value specified in op is not recognized by this kernel.
     */
     int flags = fcntl(client->sockfd, F_GETFL, 0);
-    printf("DEBUG: Original socket flags: %d\n", flags);
     if (fcntl(client->sockfd, F_SETFL, flags | O_NONBLOCK) < 0) {
         printf("DEBUG: Setting O_NONBLOCK failed: %s\n", strerror(errno));
     } else {
@@ -439,21 +424,13 @@ static client_result_t client_establish_connection(client_instance_t *client)
     uint32_t attempt = 0;
     client_result_t final_result = CLIENT_ERROR_CONNECTION;
 
-    printf("DEBUG: Starting connection attempts (max_retries=%u)\n", client->config.max_retries);
-    
     for (attempt = 0; attempt < client->config.max_retries; attempt++)
     {
-        printf("DEBUG: Connection attempt %d/%d\n", attempt + 1, client->config.max_retries);
         int connect_result = connect(client->sockfd, (struct sockaddr *)&client->server_addr,
                                      sizeof(client->server_addr));
-
-        printf("DEBUG: connect() returned: %d, errno: %d (%s)\n", 
-               connect_result, errno, strerror(errno));
         
         if (connect_result == 0)
         {
-            printf("DEBUG: Connection SUCCESS on attempt %d\n", attempt + 1);
-            // Restore blocking mode before returning
             if (fcntl(client->sockfd, F_SETFL, flags) < 0) {
                 printf("DEBUG: WARNING: Failed to restore blocking mode: %s\n", strerror(errno));
             } else {
@@ -556,12 +533,9 @@ static client_result_t client_establish_connection(client_instance_t *client)
         */
         if (errno == EINPROGRESS || errno == EALREADY)
         {
-            printf("DEBUG: Connection in progress, checking with poll...\n");
             // select\poll
             if (check_connection_complete_poll(client->sockfd, client->config.timeout_ms))
             {
-                printf("DEBUG: Poll check SUCCESS\n");
-                // Restore blocking mode before returning
                 fcntl(client->sockfd, F_SETFL, flags);
 
                 client->status = CLIENT_STATUS_CONNECTED;
@@ -576,8 +550,6 @@ static client_result_t client_establish_connection(client_instance_t *client)
         }
         else if (errno == EISCONN)
         {
-            printf("DEBUG: Socket already connected\n");
-            // Restore blocking mode before returning
             fcntl(client->sockfd, F_SETFL, flags);
 
             client->status = CLIENT_STATUS_CONNECTED;
@@ -589,14 +561,10 @@ static client_result_t client_establish_connection(client_instance_t *client)
         else if (errno == ECONNREFUSED || errno == ETIMEDOUT ||
                  errno == ENETUNREACH || errno == EHOSTUNREACH)
         {
-            printf("DEBUG: Temporary error (will retry): %s\n", strerror(errno));
-            // These are temporary errors - continue to next attempt
             final_result = CLIENT_ERROR_CONNECTION;
         }
         else
         {
-            // Critical error that shouldn't be retried
-            printf("DEBUG: Critical error: %s\n", strerror(errno));
             snprintf(client->last_error, sizeof(client->last_error),
                      "Critical connection error: %s", strerror(errno));
             final_result = CLIENT_ERROR_CONNECTION;
@@ -606,18 +574,14 @@ static client_result_t client_establish_connection(client_instance_t *client)
         if (attempt < client->config.max_retries - 1)
         {
             int backoff_ms = 100 * (1 << attempt);
-            printf("DEBUG: Backoff %d ms before next attempt\n", backoff_ms);
             usleep(backoff_ms * 1000); // Exponential backoff
         }
     }
 
-    // Restore blocking mode before returning error
-    printf("DEBUG: All connection attempts failed, restoring blocking mode\n");
     fcntl(client->sockfd, F_SETFL, flags);
 
     if (final_result != CLIENT_SUCCESS)
     {
-        printf("DEBUG: Final connection result: FAILED\n");
         snprintf(client->last_error, sizeof(client->last_error),
                  "Connection failed after %d attempts: %s",
                  client->config.max_retries, strerror(errno));
@@ -958,14 +922,12 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
         return CLIENT_ERROR_PROTOCOL;
     }
 
-    // Ensure connection
     client_result_t conn_result = client_connect(client);
     if (conn_result != CLIENT_SUCCESS)
     {
         return conn_result;
     }
 
-    // Build command: "SET key value\r\n"
     char command[get_client_max_key_length() + get_client_max_value_length() + 32];
     snprintf(command, sizeof(command), "SET %s %s\r\n", key, value);
 
@@ -997,14 +959,12 @@ client_result_t client_get(client_instance_t *client, const char *key, char *val
         return CLIENT_ERROR_PROTOCOL;
     }
 
-    // Ensure connection
     client_result_t conn_result = client_connect(client);
     if (conn_result != CLIENT_SUCCESS)
     {
         return conn_result;
     }
 
-    // Build command: "GET key\r\n"
     char command[get_client_max_key_length() + 32];
     snprintf(command, sizeof(command), "GET %s\r\n", key);
 
@@ -1016,9 +976,8 @@ client_result_t client_get(client_instance_t *client, const char *key, char *val
 
     if (result == CLIENT_SUCCESS)
     {
-        // Copy value to user buffer (safe bounded copy)
         strncpy(value_buffer, response, buffer_size - 1);
-        value_buffer[buffer_size - 1] = '\0'; // Ensure null termination
+        value_buffer[buffer_size - 1] = '\0'; 
     }
     else
     {
