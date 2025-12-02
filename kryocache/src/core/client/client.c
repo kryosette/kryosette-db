@@ -928,7 +928,20 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
         return conn_result;
     }
 
+    // warning
     char command[get_client_max_key_length() + get_client_max_value_length() + 32];
+    /*
+    !buffer overflow!
+
+    ssnprintf — print formatted output
+
+    #include <stdio.h>
+
+    int snprintf(char *restrict s, size_t n,
+        const char *restrict format, ...);
+
+    The format string is composed of zero or more directives: ordinary characters (not %), which are copied unchanged to the output stream; 
+    */
     snprintf(command, sizeof(command), "SET %s %s\r\n", key, value);
 
     char response[get_client_buffer_size()];

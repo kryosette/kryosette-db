@@ -13,6 +13,7 @@ const char *storage_get(const char *key);
 
 void handle_client_connection(int client_fd)
 {
+    // temp
     char buffer[1024];
     /*
     ssize_t
@@ -179,6 +180,9 @@ bool storage_set(const char *key, const char *value) {
     In computer science, "buckets" are containers for holding related data.
     */
     storage_node_db_t *node = g_storage.buckets[index]; // until 64
+
+    // temp
+    extern storage_db_t g_storage;
 
     while (node) {
         if (strcmp(node->key, key) == 0) {
