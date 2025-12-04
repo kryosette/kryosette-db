@@ -23,6 +23,8 @@ typedef struct {
     time_t issued_at;
     time_t expires_at;
     char* client_ip;
+//    char *temp_client_ip;
+// secure_segment_t *sec_segment;
 } token_data_t;
 
 typedef struct arena_chunk {

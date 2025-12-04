@@ -535,7 +535,16 @@ static client_result_t client_establish_connection(client_instance_t *client)
             // select\poll
             if (check_connection_complete_poll(client->sockfd, client->config.timeout_ms))
             {
+                /*
+                fcntl() performs one of the operations described below on the open
+                file descriptor fd.  The operation is determined by op.
+                */
                 fcntl(client->sockfd, F_SETFL, flags);
+
+                if (errno == EACCES || errno = EAGAIN) {
+                    printf("Operation is prohibited by locks held by other processes");
+                    return -1;
+                } 
 
                 client->status = CLIENT_STATUS_CONNECTED;
                 client->connect_time = time(NULL);

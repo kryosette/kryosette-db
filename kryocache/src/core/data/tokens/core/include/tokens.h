@@ -61,3 +61,7 @@ typedef struct {
     uint64_t max_attempts;
     uint64_t req_permissions;
 } access_control_entry;
+
+typedef struct {
+
+} encrypted_storage_t;

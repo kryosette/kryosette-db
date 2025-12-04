@@ -220,6 +220,32 @@ static app_result_t handle_set_command(client_instance_t *client,
     return (result == CLIENT_SUCCESS) ? APP_SUCCESS : APP_ERROR_OPERATION;
 }
 
+static app_result_t handle_set_command(client_instance_t *client,
+                                       int argc, char *argv[],
+                                       bool verbose) {
+    if (argc < 3) {
+        printf("Args < 3")
+    }
+
+    const char *key = argv[0];
+    const char *value1 = argv[1];
+    const char *value2 = argv[2];
+
+    if (strlen(key) > get_client_max_key_length())
+    {
+        fprintf(stderr, "Error: Key too long (max %u characters)\n", get_client_max_key_length());
+        return APP_ERROR_USAGE;
+    }
+
+    if (strlen(value) > get_client_max_value_length())
+    {
+        fprintf(stderr, "Error: Value too long (max %u characters)\n", get_client_max_value_length());
+        return APP_ERROR_USAGE;
+    }
+
+    print_connection_info();
+}
+
 /**
  * @brief Handle GET command
  *
