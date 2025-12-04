@@ -8,7 +8,8 @@
         "string.h": "c",
         "pthread.h": "c",
         "unistd.h": "c",
-        "cstdint": "c"
+        "cstdint": "c",
+        "core.h": "c"
     },
     "cmake.sourceDirectory": "C:/Users/dmako/kryosette/kryosette-db/third-party"
 }

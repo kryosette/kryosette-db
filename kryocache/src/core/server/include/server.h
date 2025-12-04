@@ -20,6 +20,29 @@ extern "C"
 #include <pthread.h>
 #include <netinet/in.h>
 
+    typedef struct {
+        int err;
+        char errstr[256];
+        int sockfd;
+        int flags;
+        bool connected;
+        const char *host;
+        uint32_t port;
+        uint32_t timeout_ms;
+        char *obuf;
+        size_t obuf_len;
+        time_t connect_time;
+        time_t last_activity;
+        uint64_t commands_sent;
+        uint64_t bytes_sent;
+        uint64_t bytes_received;
+        void *ssl_ctx;
+        void (*on_connect)(void*);
+        void (*on_disconnect)(void*);
+        void (*on_error)(void*);
+        void *callback_data;
+    } kryocache_context_t;
+
     /* ===== Data Types and Constants ===== */
 
     typedef struct sockaddr_in sockaddr_in_t;
