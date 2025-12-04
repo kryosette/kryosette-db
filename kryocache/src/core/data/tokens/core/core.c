@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <errno.h>
+#include <sys/mman.h>
 
 static arena_chunk_t* arena_chunk_create(size_t size);
 static void arena_chunk_destroy(arena_chunk_t* chunk);
@@ -215,6 +216,18 @@ void* arena_alloc(arena_memory_t* arena, size_t size) {
     arena->current->used += size;
     arena->total_used += size;
 
+    if (ptr == MAP_FAILED) {
+        return NULL;
+    }
+
+    /*
+    #include <sys/mman.h>
+
+    int mprotect(size_t size;
+                    void addr[size], size_t size, int prot);
+    */
+    mprotect(ptr, size, PROT_READ | PROT_WRITE);
+
     pthread_mutex_unlock(&arena->lock);
     return ptr;
 }
@@ -281,6 +294,8 @@ void arena_cleanup_old(arena_memory_t* arena, time_t max_age) {
     }
 
     arena->last_cleanup = now;
+
+    mprotect(chunk_ptr, size, PROT_READ | PROT_WRITE);
 
     pthread_mutex_unlock(&arena->lock);
 }

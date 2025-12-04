@@ -22,7 +22,6 @@
 static client_result_t client_establish_connection(client_instance_t *client);
 static bool check_connection_complete_poll(int sockfd, int timeout_ms);
 
-
 /*
 CLIENT LIFECYCLE MANAGEMENT PRINCIPLE
 
