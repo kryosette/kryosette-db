@@ -19,6 +19,7 @@ extern "C"
 #include <time.h>
 #include <pthread.h>
 #include <netinet/in.h>
+#include "/Users/dimaeremin/kryosette-db/kryocache/white_list/client/white_list_client.h"
 
     /* ===== Data Types and Constants ===== */
 
@@ -93,6 +94,7 @@ extern "C"
         char last_error[256];            /**< Last error message */
         time_t connect_time;             /**< Connection establishment time */
         time_t last_activity;            /**< Last operation time */
+        enum_system_t cmd_system;
     } client_instance_t;
 
     /** @} */

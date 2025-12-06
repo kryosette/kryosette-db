@@ -884,6 +884,32 @@ void client_destroy(client_instance_t *client)
 // ==================== Client Operations API Implementation ====================
 
 /*
+struct command_definition_impl {
+    const char *cmd_name;
+    secure_cmd_id_t cmd_id;   
+    size_t min_args;
+    size_t max_args;
+    bool (*validator)(const char **args, size_t args_count);
+    void (*handler)(client_instance_t *client, const char **args, size_t args_count);
+    
+    uint32_t sec_front;
+    uint32_t sec_back;
+};
+*/
+static struct command_definition_impl *find_command_safe(const char *cmd_id) {
+    if (!cmd_id) return NULL;
+
+    // char upper cmd
+    char upper_string[32];
+    upper_string[sizeof(upper_string - 1)] = '\0';
+
+    safe_to_upper_string(upper_string, sizeof(upper_string));
+
+    
+    strncpy(upper_string, cmd_id, sizeof(upper_string) - 1);
+}
+
+/*
 PROTOCOL DESIGN PRINCIPLE
 
 The client uses a simple text-based protocol similar to Redis:

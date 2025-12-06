@@ -21,8 +21,8 @@ static const uint64_t CMD_SEEDS[10][2] = {
     {0xFEEDFACE87654321, 0xDECAFBAD12345678}, // DELETE
     {0xCAFEDEAD43218765, 0xBEEFFACE56781234}, // EXISTS
     {0xDEADC0DE56781234, 0xFACEB00C43218765}, // KEYS
-    {0xBADCAFE87654321, 0xDEADCODE12345678},  // PING
-    {0xCOFFEE12345678, 0xTEABAG87654321},     // INFO
+    {0xBADCAFE87654321, 0xDEADC0DE12345678},  // PING
+    {0xC0FFEE12345678, 0xFEABA687654321},     // INFO
     {0xBABEFACE43218765, 0xDEADD00D56781234}, // QUIT
     {0xFACEFEED87654321, 0xCAFEB0BA12345678}, // AUTH
     {0xDEADFACE56781234, 0xFEEDBEEF43218765}, // SELECT
@@ -39,19 +39,20 @@ struct enum_system
     secure_cmd_id_t generated_ids[10];
     uint64_t validation_keys[10];
     time_t init_time;
-    uint32_t;
+    uint32_t system_magic;
 };
 
-
-struct command_definition {
+struct command_definition_impl {
     const char *cmd_name;
-    white_list cmd_id;
+    secure_cmd_id_t cmd_id;   
     size_t min_args;
     size_t max_args;
     bool (*validator)(const char **args, size_t args_count);
     void (*handler)(client_instance_t *client, const char **args, size_t args_count);
+    
+    uint32_t sec_front;
+    uint32_t sec_back;
 };
-
 
 static const command_definition valid_commands[] = {
     {"GET",    CMD_GET,    1, 1, validate_key,   handle_get},
@@ -61,6 +62,17 @@ static const command_definition valid_commands[] = {
     {"QUIT",   CMD_QUIT,   0, 0, NULL,           handle_quit},
     {"AUTH",   CMD_AUTH,   1, 1, validate_auth,  handle_auth},
 };
+
+static void safe_to_upper_string(char *str, size_t max_len) {
+    if (!str || max_len == 0) return;
+
+    for (size_t i = 0; i < max_len - 1 && str[i] != '\0'; i++) {
+        unsigned char c = str[i];
+        if (c - 'a' < 26) {
+            str[i] = c ^ 0x20;
+        }
+    }
+}
 
 static secure_cmd_id_t generate_secure_id(drs_generator *gen) {
     uint64_t base = drs_next(gen);
@@ -97,11 +109,16 @@ enum_system_t enum_system_init(uint64_t seed) {
     if (!sys) return NULL;
 
     uint64_t seed1 = master_seed ^ 0xDEADBEEFCAFEBABE;
+
     /*
     '~' - inversion
     */
     uint64_t seed2 = ~master_seed ^ 0xBEEFDEADFACEFACE;
     drs_init(&sys->gen, seed1, seed2); 
+
+    sys->init_time = time(NULL);
+    // ENUMSEC/0 (ASCII)
+    sys->system_magic = 0x454E554D53454300;
 
     for (int i = 0; i < 10; i++) {
         drs_generator cmd_gen;
@@ -111,15 +128,32 @@ enum_system_t enum_system_init(uint64_t seed) {
     
         sys->validation_keys[i] = drs_range(&cmd_gen, 0x1000, 0xFFFF);
         sys->validation_keys[i] ^= sys->generated_ids[i];
+
+        /*
+        example:
+        0x3344556677880000 (16)
+        and the remaining 48 bits
+        */
         sys->validation_keys[i] = (sys->validation_keys[i] << 16) | 
                               (sys->validation_keys[i] >> 48);
     }
 
-    return (enum_system_t) sys;
+    return (enum_system_t)sys;
 }
 
-static void safe_to_upper_string(char *str, size_t max_len) {
-    for (size_t i = 0; i < max_len; i++) {
+int secure_validate_cmd_id(secure_enum_sys_t sys, secure_cmd_id_t cmd_id) {
+    struct secure_enum_sys_t *enum_sys = (struct secure_enum_sys_t*)sys;
+    if (!enum_sys || enum_sys->system_magic != 0x454E554D53454300) return 0;
 
+    for (int i = 0; i < 10; i++) {
+        if (enum_sys->generated_ids[i] == cmd_id) {
+            uint64_t check = cmd_id ^ enum_sys->validation_keys[i];
+            check = (check >> 16) | (check << 48);
+            if ((check & 0xFFFF) == (enum_sys->validation_keys[i] & 0xFFFF)) {
+                return 1;
+            }
+        }
     }
+
+    return 0;
 }
