@@ -44,12 +44,14 @@ extern "C"
     typedef enum
     {
         CLIENT_SUCCESS,            /**< Operation completed successfully */
+        CLIENT_SUCCESS_ENCRYPTED,
         CLIENT_ERROR_CONNECTION,   /**< Connection error */
         CLIENT_ERROR_TIMEOUT,      /**< Operation timeout */
         CLIENT_ERROR_PROTOCOL,     /**< Protocol error */
         CLIENT_ERROR_SERVER,       /**< Server returned error */
         CLIENT_ERROR_MEMORY,       /**< Memory allocation error */
-        CLIENT_ERROR_INVALID_PARAM /**< Invalid parameter error */
+        CLIENT_ERROR_INVALID_PARAM, /**< Invalid parameter error */
+        CLIENT_ERROR_ENCRYPTED
     } client_result_t;
 
     /**

@@ -897,9 +897,9 @@ This design provides:
 - Easy extensibility for new commands
 - Compatibility with telnet testing
 */
-
 client_result_t client_set(client_instance_t *client, const char *key, const char *value)
 {
+    // todo: processing uncorrected data
     if (client == NULL || key == NULL || value == NULL)
     {
         return CLIENT_ERROR_CONNECTION;
