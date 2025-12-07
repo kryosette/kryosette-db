@@ -53,7 +53,7 @@ client_instance_t *client_init_default(void)
     return client_init(&DEFAULT_CONFIG);
 }
 
-client_instance_t *client_init(const client_config_t *config)
+client_instance_t *client_init(const client_config_t *config, uint64_t seed)
 {
     if (config == NULL)
     {
@@ -75,6 +75,12 @@ client_instance_t *client_init(const client_config_t *config)
     client->config = *config;
     client->status = get_initial_client_status();
     client->sockfd = -1; // Invalid socket descriptor
+
+    client->cmd_system = cmd_system_init(seed);
+    if (!client->cmd_system) {
+        free(client);
+        return NULL;
+    }
 
     /*
     THREAD SAFETY: OPERATION ISOLATION
@@ -929,6 +935,17 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
     if (client == NULL || key == NULL || value == NULL)
     {
         return CLIENT_ERROR_CONNECTION;
+    }
+
+    if (!client->cmd_system) {
+        return;
+    }
+
+    struct command_definition_impl *def = find_command_safe("SET");
+    if (!cmd) return;
+
+    if (!secure_validate_cmd_id(client->cmd_system, cmd->cmd_id)) {
+        return;
     }
 
     /*

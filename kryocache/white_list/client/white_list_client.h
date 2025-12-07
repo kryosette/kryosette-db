@@ -16,7 +16,7 @@ enum_system_t cmd_system_init(uint64_t seed);
 void cmd_system_destroy(enum_system_t sys);
 
 secure_cmd_id_t cmd_system_get_cmd(enum_system_t sys, const char* cmd_name);
-int cmd_system_validate(enum_system_t sys, secure_cmd_id_t cmd_id);
+int secure_validate_cmd_id(enum_system_t sys, secure_cmd_id_t cmd_id);
 
 bool validate_key(const char **args, size_t args_count);
 bool validate_kv(const char **args, size_t args_count);
