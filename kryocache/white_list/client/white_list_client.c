@@ -1,6 +1,7 @@
 #include "white_list_client.h"
 #include "/Users/dimaeremin/kryosette-db/third-party/drs-generator/src/core/drs_generator.h"
 #include "/Users/dimaeremin/kryosette-db/third-party/smemset/include/smemset.h"
+#include "command_errors.h"
 
 #include <stdlib.h>   
 #include <string.h>  
@@ -29,7 +30,7 @@ int command_system_global_init(uint64_t seed) {
     } cmd_templates[] = {
         {"GET",    1, 1, validate_key,   handle_get},
         {"SET",    2, 2, validate_kv,    handle_set},
-        {"DEL",    1, 5, validate_keys,  handle_delete},
+        {"DELETE",    1, 5, validate_keys,  handle_delete},
         {"PING",   0, 0, NULL,           handle_ping},
         {"QUIT",   0, 0, NULL,           handle_quit},
         {"AUTH",   1, 1, validate_auth,  handle_auth},
@@ -43,7 +44,7 @@ int command_system_global_init(uint64_t seed) {
             /*
             int strncmp(const char *s1, const char *s2, size_t n);
             */
-            if (strncmp(CMD_NAMES[j], cmd_templates[i].name, strlen(cmd_templates[i].name)) == 0) { 
+            if (strcmp(CMD_NAMES[j], cmd_templates[i].name) == 0) {
                 cmd_id = sys->generated_ids[j];
                 break;
             }
@@ -63,6 +64,10 @@ int command_system_global_init(uint64_t seed) {
         g_valid_commands[i].sec_front = 0x434D4453;  // "CMDS"
         g_valid_commands[i].sec_back = 0x53454355; // "SECU"
     }
+
+    g_command_system_initialized = 1;
+
+    return 1;
 }
 
 enum white_list {
@@ -81,16 +86,16 @@ enum white_list {
 
 //                                 (2) number of columns
 static const uint64_t CMD_SEEDS[10][2] = { 
-    {0xDEADBEEF12345678, 0xCAFEBABE87654321}, // GET
-    {0xBEEFDEAD56781234, 0xFACEFACE43218765}, // SET
-    {0xFEEDFACE87654321, 0xDECAFBAD12345678}, // DELETE
-    {0xCAFEDEAD43218765, 0xBEEFFACE56781234}, // EXISTS
-    {0xDEADC0DE56781234, 0xFACEB00C43218765}, // KEYS
-    {0xBADCAFE87654321, 0xDEADC0DE12345678},  // PING
-    {0xC0FFEE12345678, 0xFEABA687654321},     // INFO
-    {0xBABEFACE43218765, 0xDEADD00D56781234}, // QUIT
-    {0xFACEFEED87654321, 0xCAFEB0BA12345678}, // AUTH
-    {0xDEADFACE56781234, 0xFEEDBEEF43218765}, // SELECT
+    {0xDEADBEEF12345678ULL, 0xCAFEBABE87654321ULL}, // GET
+    {0xBEEFDEAD56781234ULL, 0xFACEFACE43218765ULL}, // SET
+    {0xFEEDFACE87654321ULL, 0xDECAFBAD12345678ULL}, // DELETE
+    {0xCAFEDEAD43218765ULL, 0xBEEFFACE56781234ULL}, // EXISTS
+    {0xDEADC0DE56781234ULL, 0xFACEB00C43218765ULL}, // KEYS
+    {0xBADCAFE87654321ULL, 0xDEADC0DE12345678ULL},  // PING
+    {0xC0FFEE12345678ULL, 0xFEABA687654321ULL},     // INFO
+    {0xBABEFACE43218765ULL, 0xDEADD00D56781234ULL}, // QUIT
+    {0xFACEFEED87654321ULL, 0xCAFEB0BA12345678ULL}, // AUTH
+    {0xDEADFACE56781234ULL, 0xFEEDBEEF43218765ULL}, // SELECT
 };
 
 static const char *CMD_NAMES[10] = {
@@ -224,7 +229,7 @@ int secure_validate_cmd_id(enum_system_t sys, secure_cmd_id_t cmd_id) {
     for (int i = 0; i < 10; i++) {
         uint64_t gen_id_value = (uint64_t)(uintptr_t)enum_sys->generated_ids[i];
         if (gen_id_value == cmd_value) {
-            uint64_t check = cmd_id ^ enum_sys->validation_keys[i];
+            uint64_t check = cmd_value ^ enum_sys->validation_keys[i];
             check = (check >> 16) | (check << 48);
             if ((check & 0xFFFF) == (enum_sys->validation_keys[i] & 0xFFFF)) {
                 return 1;
@@ -246,3 +251,79 @@ void enum_system_destroy(enum_system_t sys) {
     free(enum_sys);
 }
 
+void command_system_global_cleanup(void) {
+    if (g_global_cmd_system) {
+        enum_system_destroy(g_global_cmd_system);
+        g_global_cmd_system = NULL;
+    }
+    
+    smemset(g_valid_commands, 0, sizeof(g_valid_commands));
+    g_command_system_initialized = 0;
+}
+
+int is_command_system_initialized(void) {
+    return g_command_system_initialized;
+}
+
+struct command_definition_impl* get_command_secure(const char* cmd_name) {
+    if (!g_command_system_initialized || !cmd_name) return NULL;
+    
+    char upper_cmd[32];
+    strncpy(upper_cmd, cmd_name, sizeof(upper_cmd) - 1);
+    upper_cmd[sizeof(upper_cmd) - 1] = '\0';
+    safe_to_upper_string(upper_cmd, sizeof(upper_cmd));
+    
+    for (int i = 0; i < 6; i++) {
+        if (g_valid_commands[i].sec_front != 0x434D4453 ||
+            g_valid_commands[i].sec_back != 0x53454355) {
+            continue;
+        }
+        
+        if (strcmp(g_valid_commands[i].cmd_name, upper_cmd) == 0) {
+            return &g_valid_commands[i];
+        }
+    }
+    
+    return NULL;
+}
+
+int execute_command_safely(client_instance_t *client, 
+                          const char* cmd_name,
+                          const char **args, 
+                          size_t args_count) {
+    if (!is_command_system_initialized()) {
+        return get_error_system_not_initialized();
+    }
+    
+    if (!client || !cmd_name || !args) {
+        return get_error_invalid_parameters();
+    }
+    
+    struct command_definition_impl* cmd = get_command_secure(cmd_name);
+    if (!cmd) {
+        return get_error_command_not_found();
+    }
+    
+    if (cmd->sec_front != 0x434D4453 || cmd->sec_back != 0x53454355) {
+        return get_error_command_corrupted();
+    }
+    
+    if (!secure_validate_cmd_id(g_global_cmd_system, cmd->cmd_id)) {
+        return get_error_command_invalid();
+    }
+    
+    if (args_count < cmd->min_args || args_count > cmd->max_args) {
+        return get_error_invalid_arg_count();
+    }
+    
+    if (cmd->validator && !cmd->validator(args, args_count)) {
+        return get_error_arg_validation_failed();
+    }
+    
+    if (cmd->handler) {
+        cmd->handler(client, args, args_count);
+        return get_error_success();
+    }
+    
+    return get_error_no_handler();
+}
