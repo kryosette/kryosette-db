@@ -37,14 +37,21 @@ int command_system_global_init(uint64_t seed) {
 
     for (int i = 0; i < 6; i++) {
         secure_cmd_id_t cmd_id = NULL;
-        if (!cmd_id) return 0;
         struct enum_system_impl *sys = (struct enum_system_impl*)g_global_cmd_system;
 
         for (int j = 0; j < 10; j++) {
-            if (strncmp(CMD_NAMES[j], cmd_templates[i].name == 0)) {
+            /*
+            int strncmp(const char *s1, const char *s2, size_t n);
+            */
+            if (strncmp(CMD_NAMES[j], cmd_templates[i].name, strlen(cmd_templates[i].name)) == 0) { 
                 cmd_id = sys->generated_ids[j];
                 break;
             }
+        }
+
+        if (!cmd_id) {
+            command_system_global_cleanup();
+            return 0;
         }
 
         g_valid_commands[i].cmd_name = cmd_templates[i].name;
@@ -113,9 +120,9 @@ struct command_definition_impl {
 };
 
 static void safe_to_upper_string(char *str, size_t max_len) {
-    if (!str || max_len == 0) return;
+    if (!str || max_len <= 1) return;
 
-    size_t i;
+    size_t i = 0;
     for (i = 0; i < max_len - 1 && str[i] != '\0'; i++) {
         unsigned char c = str[i];
         if (c - 'a' < 26) {
@@ -212,7 +219,7 @@ int secure_validate_cmd_id(enum_system_t sys, secure_cmd_id_t cmd_id) {
     Its primary purpose is to provide an integer type that is guaranteed to be large enough to hold the value of any void* pointer and, 
     when converted back to void*, will yield a pointer equal to the original.
     */
-    uint64_t cmd_value = (uint64_t)(uintptr_t)cmd_id
+    uint64_t cmd_value = (uint64_t)(uintptr_t)cmd_id;
 
     for (int i = 0; i < 10; i++) {
         uint64_t gen_id_value = (uint64_t)(uintptr_t)enum_sys->generated_ids[i];
@@ -229,7 +236,7 @@ int secure_validate_cmd_id(enum_system_t sys, secure_cmd_id_t cmd_id) {
 }
 
 void enum_system_destroy(enum_system_t sys) {
-    if (!sys) return NULL;
+    if (!sys) return;
 
     struct enum_system_impl *enum_sys = (struct enum_system_impl*)sys;
 
