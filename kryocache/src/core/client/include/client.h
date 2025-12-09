@@ -19,7 +19,6 @@ extern "C"
 #include <time.h>
 #include <pthread.h>
 #include <netinet/in.h>
-#include "/Users/dimaeremin/kryosette-db/kryocache/white_list/client/white_list_client.h"
 
     /* ===== Data Types and Constants ===== */
 
@@ -27,6 +26,8 @@ extern "C"
      * @defgroup client_constants Client Constants
      * @{
      */
+
+    typedef void *enum_system_t;
 
     /**
      * @brief Client connection status codes
@@ -107,7 +108,7 @@ extern "C"
      */
 
     client_instance_t *client_init_default(void);
-    client_instance_t *client_init(const client_config_t *config);
+    client_instance_t *client_init(const client_config_t *config, uint64_t seed);
     client_result_t client_connect(client_instance_t *client);
     client_result_t client_disconnect(client_instance_t *client);
     void client_destroy(client_instance_t *client);

@@ -14,6 +14,8 @@
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
+#include "/Users/dimaeremin/kryosette-db/kryocache/white_list/client/white_list_client.h"
+#include <inttypes.h>
 
 // ==================== CLI Constants and Configuration ====================
 
@@ -129,12 +131,12 @@ static void print_statistics(const client_instance_t *client)
     if (client_get_stats(client, &stats))
     {
         printf("📊 Client Statistics:\n");
-        printf("   Operations Total: %lu\n", stats.operations_total);
-        printf("   Operations Failed: %lu\n", stats.operations_failed);
+        printf("   Operations Total: %llu\n", (unsigned long long)stats.operations_total);
+        printf("   Operations Failed: %llu\n", (unsigned long long)stats.operations_failed);
         printf("   Success Rate: %.1f%%\n",
                stats.operations_total > 0 ? (100.0 * (stats.operations_total - stats.operations_failed) / stats.operations_total) : 0.0);
-        printf("   Bytes Sent: %lu\n", stats.bytes_sent);
-        printf("   Bytes Received: %lu\n", stats.bytes_received);
+        printf("   Bytes Sent: %llu\n", (unsigned long long)stats.bytes_sent);
+        printf("   Bytes Received: %llu\n", (unsigned long long)stats.bytes_received);
         printf("   Reconnect Count: %u\n", stats.reconnect_count);
         printf("   Connection Time: %.1f seconds\n", stats.connection_time_seconds);
     }
@@ -601,7 +603,7 @@ int main(int argc, char *argv[])
 
     This prevents resource leaks and ensures clean shutdown.
     */
-    client_instance_t *client = client_init(&config);
+    client_instance_t *client = client_init(&config, 0);
     if (client == NULL)
     {
         fprintf(stderr, "Error: Failed to initialize client\n");

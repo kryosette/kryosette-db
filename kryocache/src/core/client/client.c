@@ -1,6 +1,6 @@
 #include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/client.h"
 #include "/Users/dimaeremin/kryosette-db/kryocache/src/core/client/include/constants.h"
-#include "/Users/dimaeremin/kryosette-db/third-party/smemset/include/smemset.h"
+// #include "/Users/dimaeremin/kryosette-db/third-party/smemset/include/smemset.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +17,7 @@
 #include <fcntl.h>    // для fcntl, F_GETFL, F_SETFL, O_NONBLOCK
 #include <poll.h>     // для poll, struct pollfd, POLLOUT, POLLERR и т.д.
 #include <sys/select.h>
+#include "/Users/dimaeremin/kryosette-db/kryocache/white_list/client/white_list_client.h"
 
 // Forward declarations (temp)
 static client_result_t client_establish_connection(client_instance_t *client);
@@ -50,7 +51,7 @@ client_instance_t *client_init_default(void)
         initialized = 1;
     }
 
-    return client_init(&DEFAULT_CONFIG);
+    return client_init(&DEFAULT_CONFIG, 0);
 }
 
 client_instance_t *client_init(const client_config_t *config, uint64_t seed)
@@ -547,7 +548,7 @@ static client_result_t client_establish_connection(client_instance_t *client)
                 */
                 fcntl(client->sockfd, F_SETFL, flags);
 
-                if (errno == EACCES || errno = EAGAIN) {
+                if (errno == EACCES || errno == EAGAIN) {
                     printf("Operation is prohibited by locks held by other processes");
                     return -1;
                 } 
@@ -907,12 +908,12 @@ static struct command_definition_impl *find_command_safe(const char *cmd_id) {
 
     // char upper cmd
     char upper_string[32];
-    upper_string[sizeof(upper_string - 1)] = '\0';
+    upper_string[sizeof(upper_string) - 1] = '\0';
 
-    safe_to_upper_string(upper_string, sizeof(upper_string));
+    safe_to_upper_string(upper_string, sizeof(upper_string), cmd_id);
 
     
-    strncpy(upper_string, cmd_id, sizeof(upper_string) - 1);
+    return (struct command_definition_impl *)get_command_secure(upper_string);
 }
 
 /*
@@ -931,21 +932,47 @@ This design provides:
 */
 client_result_t client_set(client_instance_t *client, const char *key, const char *value)
 {
-    // todo: processing uncorrected data
     if (client == NULL || key == NULL || value == NULL)
     {
         return CLIENT_ERROR_CONNECTION;
     }
 
-    if (!client->cmd_system) {
-        return;
+    if (!is_command_system_initialized()) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Command system not initialized");
+        return CLIENT_ERROR_PROTOCOL;
     }
 
-    struct command_definition_impl *def = find_command_safe("SET");
-    if (!cmd) return;
+    if (!client->cmd_system) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Client command system not initialized");
+        return CLIENT_ERROR_PROTOCOL;
+    }
 
-    if (!secure_validate_cmd_id(client->cmd_system, cmd->cmd_id)) {
-        return;
+    const struct command_definition_impl *cmd_def = get_command_secure("SET");
+    if (!cmd_def) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Command 'SET' not found in system");
+        return CLIENT_ERROR_PROTOCOL;
+    }
+
+    if (cmd_def_get_sec_front(cmd_def) != 0x434D4453 || cmd_def_get_sec_back(cmd_def) != 0x53454355) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Command 'SET' structure corrupted");
+        return CLIENT_ERROR_PROTOCOL;
+    }
+
+    if (!secure_validate_cmd_id(client->cmd_system, cmd_def_get_id(cmd_def))) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Command 'SET' validation failed - possible tampering");
+        return CLIENT_ERROR_PROTOCOL;
+    }
+
+    const char* set_args[] = {key, value};
+    if (cmd_def_has_validator(cmd_def) && !cmd_def_validate(cmd_def, set_args, 2)) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "SET command arguments validation failed");
+        return CLIENT_ERROR_INVALID_PARAM;
     }
 
     /*
@@ -979,21 +1006,21 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
         return conn_result;
     }
 
-    // warning
-    char command[get_client_max_key_length() + get_client_max_value_length() + 32];
-    /*
-    !buffer overflow!
+    size_t cmd_len = strlen(key) + strlen(value) + 32; // "SET " + " " + "\r\n" + запас
+    if (cmd_len > get_max_command_length()) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Command too long: %zu bytes (max: %u)", cmd_len, get_max_command_length());
+        return CLIENT_ERROR_PROTOCOL;
+    }
 
-    ssnprintf — print formatted output
-
-    #include <stdio.h>
-
-    int snprintf(char *restrict s, size_t n,
-        const char *restrict format, ...);
-
-    The format string is composed of zero or more directives: ordinary characters (not %), which are copied unchanged to the output stream; 
-    */
-    snprintf(command, sizeof(command), "SET %s %s\r\n", key, value);
+    char command[get_max_command_length()];
+    int written = snprintf(command, sizeof(command), "SET %s %s\r\n", key, value);
+    
+    if (written < 0 || (size_t)written >= sizeof(command)) {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Failed to format SET command");
+        return CLIENT_ERROR_PROTOCOL;
+    }
 
     char response[get_client_buffer_size()];
     client_result_t result = client_send_command(client, command, response, sizeof(response));
@@ -1003,6 +1030,12 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
     if (result != CLIENT_SUCCESS)
     {
         client->stats.operations_failed++;
+        if (response[0] != '\0') {
+            strncpy(client->last_error, response, sizeof(client->last_error) - 1);
+            client->last_error[sizeof(client->last_error) - 1] = '\0';
+        }
+    } else {
+        client->last_error[0] = '\0';
     }
     pthread_mutex_unlock(&client->lock);
 
@@ -1047,46 +1080,9 @@ client_result_t client_get(client_instance_t *client, const char *key, char *val
     {
         client->stats.operations_failed++;
     }
-    pthread_mutex_unlock(&client->lock);
+    pthread_mutex_unlock(&client->lock); 
 
-    return result;
-}
-
-client_result_t client_delete(client_instance_t *client, const char *key)
-{
-    if (client == NULL || key == NULL)
-    {
-        return CLIENT_ERROR_CONNECTION;
-    }
-
-    if (strlen(key) > get_client_max_key_length())
-    {
-        snprintf(client->last_error, sizeof(client->last_error),
-                 "Key too long: %zu bytes (max: %u)", strlen(key), get_client_max_key_length());
-        return CLIENT_ERROR_PROTOCOL;
-    }
-
-    client_result_t conn_result = client_connect(client);
-    if (conn_result != CLIENT_SUCCESS)
-    {
-        return conn_result;
-    }
-
-    char command[get_client_max_key_length() + 32];
-    snprintf(command, sizeof(command), "DELETE %s\r\n", key);
-
-    char response[get_client_buffer_size()];
-    client_result_t result = client_send_command(client, command, response, sizeof(response));
-
-    pthread_mutex_lock(&client->lock);
-    client->stats.operations_total++;
-    if (result != CLIENT_SUCCESS)
-    {
-        client->stats.operations_failed++;
-    }
-    pthread_mutex_unlock(&client->lock);
-
-    return result;
+    return result;  
 }
 
 client_result_t client_exists(client_instance_t *client, const char *key)
@@ -1168,6 +1164,43 @@ client_result_t client_ping(client_instance_t *client)
 
     char response[get_client_buffer_size()];
     client_result_t result = client_send_command(client, "PING\r\n", response, sizeof(response));
+
+    pthread_mutex_lock(&client->lock);
+    client->stats.operations_total++;
+    if (result != CLIENT_SUCCESS)
+    {
+        client->stats.operations_failed++;
+    }
+    pthread_mutex_unlock(&client->lock);
+
+    return result;
+}
+
+client_result_t client_delete(client_instance_t *client, const char *key)
+{
+    if (client == NULL || key == NULL)
+    {
+        return CLIENT_ERROR_CONNECTION;
+    }
+
+    if (strlen(key) > get_client_max_key_length())
+    {
+        snprintf(client->last_error, sizeof(client->last_error),
+                 "Key too long: %zu bytes (max: %u)", strlen(key), get_client_max_key_length());
+        return CLIENT_ERROR_PROTOCOL;
+    }
+
+    client_result_t conn_result = client_connect(client);
+    if (conn_result != CLIENT_SUCCESS)
+    {
+        return conn_result;
+    }
+
+    char command[512];  
+    snprintf(command, sizeof(command), "DELETE %s\r\n", key);
+
+    char response[4096];
+    client_result_t result = client_send_command(client, command, response, sizeof(response));
 
     pthread_mutex_lock(&client->lock);
     client->stats.operations_total++;
