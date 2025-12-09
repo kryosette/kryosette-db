@@ -61,15 +61,16 @@ static const uint64_t CMD_SEEDS[10][2] = {
     {0xDEADFACE56781234ULL, 0xFEEDBEEF43218765ULL}, // SELECT
 };
 
+struct drs_generator {
+    uint64_t seed1;      // Первый сид (основная последовательность)
+    uint64_t seed2;      // Второй сид (смещения и трансформации)
+    uint64_t counter;    // Счетчик вызовов
+};
+
 static const char *CMD_NAMES[10] = {
     "GET", "SET", "DELETE", "EXISTS", "KEYS",
     "PING", "INFO", "QUIT", "AUTH", "SELECT"
 };
-
-struct drs_generator {
-    uint64_t state[2];
-};
-
 struct enum_system_impl
 {
     struct drs_generator gen;
@@ -121,20 +122,25 @@ int command_system_global_init(uint64_t seed) {
     };
 
     for (int i = 0; i < 6; i++) {
-        secure_cmd_id_t cmd_id = NULL;
-        struct enum_system_impl *sys = (struct enum_system_impl*)g_global_cmd_system;
-
+        int cmd_index = -1;
         for (int j = 0; j < 10; j++) {
-            /*
-            int strncmp(const char *s1, const char *s2, size_t n);
-            */
             if (strcmp(CMD_NAMES[j], cmd_templates[i].name) == 0) {
-                cmd_id = sys->generated_ids[j];
+                cmd_index = j;
                 break;
             }
         }
-
+        
+        if (cmd_index == -1) {
+            printf("ERROR: Command '%s' not found in CMD_NAMES\n", cmd_templates[i].name);
+            command_system_global_cleanup();
+            return 0;
+        }
+        
+        struct enum_system_impl *sys = (struct enum_system_impl*)g_global_cmd_system;
+        secure_cmd_id_t cmd_id = sys->generated_ids[cmd_index];
+        
         if (!cmd_id) {
+            printf("ERROR: Command ID for '%s' is NULL\n", cmd_templates[i].name);
             command_system_global_cleanup();
             return 0;
         }
@@ -147,9 +153,13 @@ int command_system_global_init(uint64_t seed) {
         g_valid_commands[i].handler = cmd_templates[i].handler;
         g_valid_commands[i].sec_front = 0x434D4453;  // "CMDS"
         g_valid_commands[i].sec_back = 0x53454355; // "SECU"
+        
+        printf("DEBUG: Initialized command '%s' with ID %p\n", 
+               cmd_templates[i].name, cmd_id);
     }
 
     g_command_system_initialized = 1;
+    printf("DEBUG: command_system_global_init completed successfully\n");
 
     return 1;
 }
@@ -210,8 +220,13 @@ static secure_cmd_id_t generate_secure_id(struct drs_generator *gen, int cmd_ind
 }
 
 enum_system_t enum_system_init(uint64_t seed) {
+         printf("DEBUG client_init: enum\n"); fflush(stdout);
+
     struct enum_system_impl *sys = calloc(1, sizeof(*sys));
-    if (!sys) return NULL;
+    if (!sys) {
+        printf("not sys"); fflush(stdout);
+        return NULL;
+    }
 
     uint64_t seed1 = seed ^ 0xDEADBEEFCAFEBABE;
 

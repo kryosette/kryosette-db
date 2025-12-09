@@ -516,6 +516,11 @@ static app_result_t handle_status_command(client_instance_t *client, bool verbos
 int main(int argc, char *argv[])
 {
     // Default configuration
+
+    if (!command_system_global_init(time(NULL))) {
+        fprintf(stderr, "Error: Failed to initialize command system\n");
+        return 0;
+    }
     client_config_t config = client_config_default();
     bool verbose = false;
     const char *command = NULL;
