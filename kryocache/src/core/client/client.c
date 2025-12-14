@@ -59,8 +59,6 @@ client_instance_t *client_init_default(void)
 
 client_instance_t *client_init(const client_config_t *config, uint64_t seed)
 {
-        printf("DEBUG client_init: START\n"); fflush(stdout);
-
     if (config == NULL)
     {
         return NULL;
@@ -76,23 +74,17 @@ client_instance_t *client_init(const client_config_t *config, uint64_t seed)
     {
         return NULL;
     }
-     printf("DEBUG client_init: 1\n"); fflush(stdout);
 
     // Copy configuration (shallow copy for now)
     client->config = *config;
     client->status = get_initial_client_status();
     client->sockfd = -1; // Invalid socket descriptor
 
-     printf("DEBUG client_init: CMD\n"); fflush(stdout);
-
     client->cmd_system = cmd_system_init(seed);
     if (!client->cmd_system) {
-        printf("not client");
         free(client);
         return NULL;
     }
-
-     printf("DEBUG client_init: 2\n"); fflush(stdout);
 
     /*
     THREAD SAFETY: OPERATION ISOLATION
@@ -943,26 +935,22 @@ This design provides:
 */
 client_result_t client_set(client_instance_t *client, const char *key, const char *value)
 {
-    printf("DEBUG main: starting\n"); fflush(stdout);
     if (client == NULL || key == NULL || value == NULL)
     {
         return CLIENT_ERROR_CONNECTION;
     }
-    printf("DEBUG main: 1\n"); fflush(stdout);
 
     // if (!is_command_system_initialized()) {
     //     snprintf(client->last_error, sizeof(client->last_error),
     //              "Command system not initialized");
     //     return CLIENT_ERROR_PROTOCOL;
     // }
-    printf("DEBUG main: 2\n"); fflush(stdout);
 
     if (!client->cmd_system) {
         snprintf(client->last_error, sizeof(client->last_error),
                  "Client command system not initialized");
         return CLIENT_ERROR_PROTOCOL;
     }
-    printf("DEBUG main: 3\n"); fflush(stdout);
 
     const struct command_definition_impl *cmd_def = get_command_secure("SET");
     if (!cmd_def) {
@@ -970,21 +958,18 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
                  "Command 'SET' not found in system");
         return CLIENT_ERROR_PROTOCOL;
     }
-    printf("DEBUG main: 4\n"); fflush(stdout);
 
     if (cmd_def_get_sec_front(cmd_def) != 0x434D4453 || cmd_def_get_sec_back(cmd_def) != 0x53454355) {
         snprintf(client->last_error, sizeof(client->last_error),
                  "Command 'SET' structure corrupted");
         return CLIENT_ERROR_PROTOCOL;
     }
-    printf("DEBUG main: 5\n"); fflush(stdout);
 
     // if (!secure_validate_cmd_id(g_global_cmd_system, cmd_def_get_id(cmd_def))) {
     //     snprintf(client->last_error, sizeof(client->last_error),
     //              "Command 'SET' validation failed - possible tampering");
     //     return CLIENT_ERROR_PROTOCOL;
     // }
-    printf("DEBUG main: 6\n"); fflush(stdout);
 
     const char* set_args[] = {key, value};
     if (cmd_def_has_validator(cmd_def) && !cmd_def_validate(cmd_def, set_args, 2)) {
@@ -992,8 +977,6 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
                  "SET command arguments validation failed");
         return CLIENT_ERROR_INVALID_PARAM;
     }
-        printf("DEBUG main: 7\n"); fflush(stdout);
-
 
     /*
     INPUT VALIDATION PRINCIPLE
@@ -1012,8 +995,6 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
                  "Key too long: %zu bytes (max: %u)", strlen(key), get_client_max_key_length());
         return CLIENT_ERROR_PROTOCOL;
     }
-        printf("DEBUG main: 8\n"); fflush(stdout);
-
 
     if (strlen(value) > get_client_max_value_length())
     {
@@ -1021,8 +1002,6 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
                  "Value too long: %zu bytes (max: %u)", strlen(value), get_client_max_value_length());
         return CLIENT_ERROR_PROTOCOL;
     }
-        printf("DEBUG main: 9\n"); fflush(stdout);
-
 
     client_result_t conn_result = client_connect(client);
     if (conn_result != CLIENT_SUCCESS)
@@ -1030,18 +1009,12 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
         return conn_result;
     }
 
-        printf("DEBUG main: 10\n"); fflush(stdout);
-
-
     size_t cmd_len = strlen(key) + strlen(value) + 32; // "SET " + " " + "\r\n" + запас
     if (cmd_len > get_max_command_length()) {
         snprintf(client->last_error, sizeof(client->last_error),
                  "Command too long: %zu bytes (max: %u)", cmd_len, get_max_command_length());
         return CLIENT_ERROR_PROTOCOL;
     }
-
-        printf("DEBUG main: 11\n"); fflush(stdout);
-
 
     char command[get_max_command_length()];
     int written = snprintf(command, sizeof(command), "SET %s %s\r\n", key, value);
@@ -1068,9 +1041,6 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
         client->last_error[0] = '\0';
     }
     pthread_mutex_unlock(&client->lock);
-
-        printf("DEBUG main: 12\n"); fflush(stdout);
-
 
     return result;
 }
