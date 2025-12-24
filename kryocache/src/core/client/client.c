@@ -157,7 +157,7 @@ static client_result_t client_send_command(client_instance_t *client,
     }
 
     client_result_t result = CLIENT_SUCCESS;
-    ssize_t bytes_sent, bytes_received;
+    ssize_t bytes_sent = 0, bytes_received = 0;
 
     size_t command_len = strlen(command);
     if (command_len == 0 || command_len > MAX_COMMAND_LENGTH)
@@ -279,7 +279,8 @@ static client_result_t client_establish_connection(client_instance_t *client)
                  example of such an address is ::FFFF:204.152.189.116.
 
     */
-    struct in6_addr ipv6_addr;
+    struct in6_addr ipv6_addr = {0};
+    smemset(&ipv6_addr, 0, sizeof(ipv6_addr));
     if (inet_pton(AF_INET6, client->config.host, &ipv6_addr) != 1)
     {
         snprintf(client->last_error, sizeof(client->last_error),
