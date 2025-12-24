@@ -942,7 +942,7 @@ client_result_t client_set(client_instance_t *client, const char *key, const cha
 
     // if (!is_command_system_initialized()) {
     //     snprintf(client->last_error, sizeof(client->last_error),
-    //              "Command system not initialized");
+    //              "Command system not initialized"); 
     //     return CLIENT_ERROR_PROTOCOL;
     // }
 
